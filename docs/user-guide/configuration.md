@@ -150,7 +150,7 @@ ISO_TYPE=minimal                      # Faster boot with minimal ISO
 HYPERSHIFT_IMAGE=quay.io/hypershift/hypershift-operator:latest
 HOSTED_CLUSTER_NAME=doca              # Hosted cluster name
 CLUSTERS_NAMESPACE=clusters           # Management namespace
-OCP_RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:4.20.0-multi
+HOSTED_CLUSTER_RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:4.20.0-multi
 ```
 
 ### Custom Registry

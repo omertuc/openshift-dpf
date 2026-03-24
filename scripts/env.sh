@@ -129,6 +129,9 @@ fi
 # Only evaluate when sourced by other scripts (not when executed directly for
 # standalone commands like validate-env-files / generate-env).
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    # Backwards compatibility: accept old OCP_RELEASE_IMAGE name
+    HOSTED_CLUSTER_RELEASE_IMAGE=${HOSTED_CLUSTER_RELEASE_IMAGE:-${OCP_RELEASE_IMAGE:-}}
+
     HELM_CHARTS_DIR=${HELM_CHARTS_DIR:-"$MANIFESTS_DIR/helm-charts-values"}
     HOST_CLUSTER_API=${HOST_CLUSTER_API:-"api.$CLUSTER_NAME.$BASE_DOMAIN"}
     HOSTED_CONTROL_PLANE_NAMESPACE=${HOSTED_CONTROL_PLANE_NAMESPACE:-"${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"}

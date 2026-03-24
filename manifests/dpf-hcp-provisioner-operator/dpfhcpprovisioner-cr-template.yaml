@@ -23,8 +23,8 @@ spec:
   # Storage class for etcd
   etcdStorageClass: <ETCD_STORAGE_CLASS>
 
-  # OCP release image
-  ocpReleaseImage: <OCP_RELEASE_IMAGE>
+  # Hosted cluster release image
+  ocpReleaseImage: <HOSTED_CLUSTER_RELEASE_IMAGE>
 
   # Pull secret reference
   pullSecretRef:

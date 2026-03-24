@@ -348,7 +348,7 @@ help:
 	@echo "  HYPERSHIFT_IMAGE  - Hypershift operator image (default: $(HYPERSHIFT_IMAGE))"
 	@echo "  HOSTED_CLUSTER_NAME - Name of the hosted cluster (default: $(HOSTED_CLUSTER_NAME))"
 	@echo "  CLUSTERS_NAMESPACE - Namespace for clusters (default: $(CLUSTERS_NAMESPACE))"
-	@echo "  OCP_RELEASE_IMAGE - OCP release image for hosted cluster (default: $(OCP_RELEASE_IMAGE))"
+	@echo "  HOSTED_CLUSTER_RELEASE_IMAGE - Release image for hosted cluster (default: $(HOSTED_CLUSTER_RELEASE_IMAGE))"
 	@echo ""
 	@echo "Network Configuration:"
 	@echo "  POD_CIDR         - Set pod CIDR (default: $(POD_CIDR))"
