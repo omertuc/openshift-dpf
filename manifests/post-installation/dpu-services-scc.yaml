@@ -1,6 +1,7 @@
 # Namespace-wide privileged SCC binding for dpf-operator-system on the hosted
 # (DPU) cluster.
 
+# @docs-as-code: start section "configuring-hosted-cluster-auth"
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -16,3 +17,4 @@ subjects:
 - kind: Group
   apiGroup: rbac.authorization.k8s.io
   name: system:serviceaccounts:dpf-operator-system
+# @docs-as-code: end section "configuring-hosted-cluster-auth"

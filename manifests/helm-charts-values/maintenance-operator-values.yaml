@@ -1,5 +1,6 @@
 # Maintenance Operator Chart configuration for OpenShift DPF
 # Based on doca-platform/deploy/helmfiles/values/maintenance-operator-chart.yaml
+# @docs-as-code: start section "installing-maintenance-operator"
 operatorConfig:
   deploy: true
   maxParallelOperations: 60%
@@ -21,3 +22,4 @@ operator:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
+# @docs-as-code: end section "installing-maintenance-operator"

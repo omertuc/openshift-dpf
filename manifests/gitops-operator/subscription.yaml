@@ -1,3 +1,6 @@
+# @docs-as-code: file
+#   | param: "gitops-<GITOPS_OPERATOR_CHANNEL>"
+#   | param: "openshift-gitops-operator.<GITOPS_OPERATOR_VERSION>"
 ---
 apiVersion: v1
 kind: Namespace

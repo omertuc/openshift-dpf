@@ -1,11 +1,10 @@
----
+# @docs-as-code: start section "dpuflavor-spec" | param: "<NUM_VFS>"
 apiVersion: provisioning.dpu.nvidia.com/v1alpha1
 kind: DPUFlavor
 metadata:
   name: hbn-ovnk
   namespace: dpf-operator-system
   annotations:
-    # Required when flavor bfcfg exceeds the DPF limit of 128K
     provisioning.dpu.nvidia.com/skip-bfcfg-size-check: ""
 spec:
   grub:
@@ -18,7 +17,7 @@ spec:
       - hugepagesz=2048kB
       - hugepages=250
   nvconfig:
-    - device: "*"
+    - device: '*'
       parameters:
         - PF_BAR2_ENABLE=0
         - PER_PF_NUM_SF=1
@@ -113,6 +112,7 @@ spec:
       # Patch br-ovn and br-dpu together
       _ovs-vsctl set Interface pbrovntobrdpu type=patch options:peer=pbrdputobrovn
       _ovs-vsctl set Interface pbrdputobrovn type=patch options:peer=pbrovntobrdpu
+  # @docs-as-code: end section "dpuflavor-spec"
 
   # openshift-dpf currently performs all three updates unconditionally via
   # dpu-fw-upgrade.sh (ignition).

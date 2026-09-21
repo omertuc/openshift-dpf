@@ -1,4 +1,5 @@
 ---
+# @docs-as-code: start section "installing-grafana-for-dts"
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -26,3 +27,4 @@ subjects:
   - kind: ServiceAccount
     name: grafana-prometheus-reader
     namespace: dpf-operator-system
+# @docs-as-code: end section "installing-grafana-for-dts"

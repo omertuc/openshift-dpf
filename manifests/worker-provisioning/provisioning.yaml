@@ -1,4 +1,5 @@
 ---
+# @docs-as-code: start section "adding-workers-baremetal-operator"
 apiVersion: metal3.io/v1alpha1
 kind: Provisioning
 metadata:
@@ -6,3 +7,4 @@ metadata:
 spec:
   provisioningNetwork: "Disabled"
   watchAllNamespaces: false
+# @docs-as-code: end section "adding-workers-baremetal-operator"

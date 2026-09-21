@@ -1,3 +1,4 @@
+# @docs-as-code: file | param: "<VTEP_CIDR>"
 ---
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUServiceIPAM
@@ -6,6 +7,16 @@ metadata:
   namespace: dpf-operator-system
 spec:
   ipv4Network:
-    network: "<VTEP_CIDR>"
+    network: <VTEP_CIDR>
     gatewayIndex: 3
     prefixSize: 29
+---
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: loopback
+  namespace: dpf-operator-system
+spec:
+  ipv4Network:
+    network: "11.0.0.0/24"
+    prefixSize: 32

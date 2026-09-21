@@ -1,6 +1,7 @@
 # Enable user workload monitoring in OpenShift
 # This allows ServiceMonitors in user namespaces
 # to be discovered and scraped by the user workload Prometheus instance.
+# @docs-as-code: start section "enabling-user-workload-monitoring"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -9,3 +10,4 @@ metadata:
 data:
   config.yaml: |
     enableUserWorkload: true
+# @docs-as-code: end section "enabling-user-workload-monitoring"

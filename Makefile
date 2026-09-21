@@ -1,5 +1,5 @@
 # Include environment variables (skip for targets that don't need a .env)
-ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e help,$(MAKECMDGOALS)),)
+ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e check-doc-drift help,$(MAKECMDGOALS)),)
 include .env
 export
 endif
@@ -470,6 +470,11 @@ verify-dpu-nodes:
 verify-dpudeployment:
 	@$(VERIFY_SCRIPT) verify-dpudeployment
 
+.PHONY: check-doc-drift
+check-doc-drift: ## Check every DPF docs code block comes from this repo (needs asadoc and ../openshift-docs)
+	@command -v asadoc >/dev/null || { echo "asadoc not found; install it: cargo install --git https://github.com/omertuc/asadoc"; exit 1; }
+	@asadoc check
+
 .PHONY: validate-env-files
 validate-env-files:
 	@$(ENV_SCRIPT) validate-env-files
@@ -561,6 +566,7 @@ help:
 	@echo "  verify-workers        - Wait for worker nodes to be Ready in host cluster"
 	@echo "  verify-dpu-nodes      - Wait for DPU nodes to be Ready in DPUCluster"
 	@echo "  verify-dpudeployment  - Wait for DPUDeployment to be Ready"
+	@echo "  check-doc-drift       - Check every DPF docs code block comes from this repo (asadoc)"
 	@echo ""
 	@echo "E2E Tests:"
 	@echo "  test-go-e2e            - Run Go e2e tests (E2E_GO_LABEL_FILTER=dpudeployment-lifecycle)"

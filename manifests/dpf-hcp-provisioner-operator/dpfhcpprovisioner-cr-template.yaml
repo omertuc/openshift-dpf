@@ -1,3 +1,11 @@
+# @docs-as-code: file
+#   | param: "<HOSTED_CLUSTER_NAME>"
+#   | param: "<CLUSTERS_NAMESPACE>"
+#   | param: "<BASE_DOMAIN>"
+#   | param: "<ETCD_STORAGE_CLASS>"
+#   | param: "<OCP_RELEASE_IMAGE>"
+#   | param: "<DPFHCPPROVISIONER_PULL_SECRET_NAME>"
+#   | param: "<DPFHCPPROVISIONER_SSH_SECRET_NAME>"
 apiVersion: provisioning.dpu.hcp.io/v1alpha1
 kind: DPFHCPProvisioner
 metadata:

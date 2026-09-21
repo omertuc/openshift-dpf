@@ -1,3 +1,4 @@
+# @docs-as-code: file | param: "<SRIOV_DP_CONFIG_CR_NAME>"
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUDeployment
 metadata:
@@ -12,12 +13,12 @@ spec:
     bfb: bf-bundle
     flavor: hbn-ovnk
     dpuSets:
-    - nameSuffix: "dpuset1"
-      dpuAnnotations:
-        noderesources.dpu.nvidia.com/nodesriovdevicepluginconfig: <SRIOV_DP_CONFIG_CR_NAME>
-      dpuNodeSelector:
-        matchLabels:
-          feature.node.kubernetes.io/dpu-enabled: ""
+      - nameSuffix: "dpuset1"
+        dpuNodeSelector:
+          matchLabels:
+            feature.node.kubernetes.io/dpu-enabled: ""
+        dpuAnnotations:
+          noderesources.dpu.nvidia.com/nodesriovdevicepluginconfig: <SRIOV_DP_CONFIG_CR_NAME>
   services:
     hbn:
       serviceTemplate: hbn
@@ -31,23 +32,23 @@ spec:
   serviceChains:
     switches:
       - ports:
-        - serviceInterface:
-            matchLabels:
-              uplink: p0
-        - service:
-            name: hbn
-            interface: p0_if
+          - serviceInterface:
+              matchLabels:
+                uplink: p0
+          - service:
+              name: hbn
+              interface: p0_if
       - ports:
-        - serviceInterface:
-            matchLabels:
-              uplink: p1
-        - service:
-            name: hbn
-            interface: p1_if
+          - serviceInterface:
+              matchLabels:
+                uplink: p1
+          - service:
+              name: hbn
+              interface: p1_if
       - ports:
-        - serviceInterface:
-            matchLabels:
-              port: ovn
-        - service:
-            name: hbn
-            interface: pf2dpu2_if
+          - serviceInterface:
+              matchLabels:
+                port: ovn
+          - service:
+              name: hbn
+              interface: pf2dpu2_if

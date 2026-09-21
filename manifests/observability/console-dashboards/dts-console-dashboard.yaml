@@ -12,6 +12,7 @@
 # (rows/span layout, datasource "prometheus", panel type "graph").
 # Companion to the richer grafana-operator dashboard
 # (manifests/observability/grafana/dts-grafana-dashboard.yaml).
+# @docs-as-code: start section "installing-dts-console-dashboard"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -149,3 +150,4 @@ data:
         }
       ]
     }
+# @docs-as-code: end section "installing-dts-console-dashboard"

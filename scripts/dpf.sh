@@ -209,13 +209,22 @@ function deploy_dpu_worker_config() {
         version_flag="--version ${DPU_WORKER_CONFIG_CHART_VERSION}"
     fi
 
+    # @docs-as-code: start section "dpu-worker-config-install"
+    #   | doc strip-line-prefix: "$ "
+    #   | remove-prefix: "if "
+    #   | remove-suffix: "; then"
+    #   | unindent-common
+    #   | param: "\"${DPU_WORKER_CONFIG_CHART_URL}\""
+    #   | param: "${version_flag}"
+    #   | param: "${DPF_HCP_PROVISIONER_OPERATOR_NAMESPACE}"
     if helm upgrade --install dpu-worker-config \
         "${DPU_WORKER_CONFIG_CHART_URL}" \
+        ${version_flag} \
+        --registry-config "${OPENSHIFT_PULL_SECRET}" \
         --namespace ${DPF_HCP_PROVISIONER_OPERATOR_NAMESPACE} \
         --create-namespace \
-        --disable-openapi-validation \
-        --registry-config "${OPENSHIFT_PULL_SECRET}" \
-        ${version_flag}; then
+        --disable-openapi-validation; then
+    # @docs-as-code: end section "dpu-worker-config-install"
         log [INFO] "Helm release 'dpu-worker-config' deployed successfully"
     else
         log [ERROR] "Helm deployment of dpu-worker-config failed"
@@ -521,6 +530,12 @@ function deploy_maintenance_operator() {
     
     # Install Maintenance Operator
     log [INFO] "Installing Maintenance Operator chart..."
+    # @docs-as-code: start section "maintenance-operator-install"
+    #   | doc strip-line-prefix: "$ "
+    #   | unindent-common
+    #   | reindent: 4 -> 2
+    #   | param: "${MAINTENANCE_OPERATOR_VERSION}"
+    #   | param: "\"${HELM_CHARTS_DIR}/maintenance-operator-values.yaml\""
     helm upgrade --install maintenance-operator oci://ghcr.io/mellanox/maintenance-operator-chart \
         --namespace dpf-operator-system \
         --create-namespace \
@@ -528,6 +543,7 @@ function deploy_maintenance_operator() {
         --version ${MAINTENANCE_OPERATOR_VERSION} \
         --values "${HELM_CHARTS_DIR}/maintenance-operator-values.yaml" \
         --wait
+    # @docs-as-code: end section "maintenance-operator-install"
     
     log [INFO] "Maintenance Operator deployment complete!"
 }
@@ -553,8 +569,11 @@ function apply_dpf() {
     deploy_maintenance_operator
 
     log "INFO" "Enabling IP forwarding for OVN Kubernetes..."
+    # @docs-as-code: start section "ip-forwarding-patch"
+    #   | doc strip-line-prefix: "$ "
     oc patch network.operator.openshift.io cluster --type=merge -p \
     '{"spec":{"defaultNetwork":{ "ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+    # @docs-as-code: end section "ip-forwarding-patch"
     
     deploy_nfd
     

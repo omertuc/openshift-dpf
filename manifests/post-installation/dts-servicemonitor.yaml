@@ -2,6 +2,7 @@
 # Discovers DTS services dynamically using relabeling to match any service
 # whose dpuservice-name label starts with "doca-telemetry-service",
 # regardless of the generated suffix (e.g., doca-telemetry-service-bqvp6).
+# @docs-as-code: start section "configuring-dts-servicemonitor"
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -24,3 +25,4 @@ spec:
   namespaceSelector:
     matchNames:
       - dpf-operator-system
+# @docs-as-code: end section "configuring-dts-servicemonitor"

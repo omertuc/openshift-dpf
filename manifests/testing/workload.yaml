@@ -1,3 +1,7 @@
+# @docs-as-code: file
+#   | param: "sriov-test-master"
+#   | param: "sriov-test-worker"
+#   | param: "quay.io/wabouham/ecosys-nvidia/nicolaka-netshoot:latest"
 # 1. Namespace
 ---
 apiVersion: v1
