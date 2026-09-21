@@ -10,6 +10,7 @@
 # JSON plus a GrafanaDashboard CR that loads it into the dpf-grafana instance
 # (instanceSelector dashboards=dpf-grafana, same convention as
 # grafana-dashboards.yaml). No DTS/cluster reconfiguration required.
+# @docs-as-code: start section "installing-grafana-for-dts"
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -189,3 +190,4 @@ spec:
   configMapRef:
     name: dpf-dts-grafana-dashboard
     key: doca-dpu-telemetry-dts.json
+# @docs-as-code: end section "installing-grafana-for-dts"

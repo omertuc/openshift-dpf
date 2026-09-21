@@ -1,0 +1,7 @@
+$ helm upgrade --install dpf-hcp-provisioner-operator \
+    oci://registry.redhat.io/dpu-kit-for-nvidia/dpf-hcp-provisioner-chart \
+    --registry-config "${OPENSHIFT_PULL_SECRET}" \
+    --version 4.22.0 \
+    --namespace dpf-hcp-provisioner-system \
+    --create-namespace \
+    --set provisionerConfig.manageDPUServiceTemplates=true

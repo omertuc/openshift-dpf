@@ -1,0 +1,2 @@
+clusterrole.rbac.authorization.k8s.io/grafana-operator-route-manager created
+clusterrolebinding.rbac.authorization.k8s.io/grafana-operator-route-manager created

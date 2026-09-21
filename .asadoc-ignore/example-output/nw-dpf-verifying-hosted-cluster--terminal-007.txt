@@ -1,0 +1,2 @@
+NAME                          TYPE     DATA   AGE
+dpf-hosted-admin-kubeconfig   Opaque   1      10m

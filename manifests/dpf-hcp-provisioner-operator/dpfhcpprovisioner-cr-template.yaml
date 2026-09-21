@@ -1,3 +1,9 @@
+# @docs-as-code: file
+#   | param: "<*>"
+#   | remove-lines-starting-with: "#"
+#   | remove-lines-starting-with: "machineOSURL:"
+#   | remove-lines-starting-with: "controlPlaneAvailabilityPolicy:"
+#   | remove-blank-lines
 apiVersion: provisioning.dpu.hcp.io/v1alpha1
 kind: DPFHCPProvisioner
 metadata:
@@ -36,3 +42,6 @@ spec:
 
   # Control plane availability policy
   controlPlaneAvailabilityPolicy: <CONTROL_PLANE_POLICY>
+
+  # Virtual IP for LoadBalancer (removed when HYPERSHIFT_API_IP is unset)
+  virtualIP: <HYPERSHIFT_API_IP>

@@ -1,0 +1,1 @@
+$ oc get namespace dpf-operator-system

@@ -1,5 +1,5 @@
 # Include environment variables (skip for targets that don't need a .env)
-ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e help,$(MAKECMDGOALS)),)
+ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e check-doc-drift help,$(MAKECMDGOALS)),)
 include .env
 export
 endif
@@ -477,6 +477,22 @@ verify-dpu-nodes:
 verify-dpudeployment:
 	@$(VERIFY_SCRIPT) verify-dpudeployment
 
+# asadoc release used by check-doc-drift, downloaded into .bin/ on first use.
+# Use your own build instead with: make check-doc-drift ASADOC=asadoc
+ASADOC_VERSION ?= v0.2.1
+ASADOC ?= .bin/asadoc-$(ASADOC_VERSION)
+
+.bin/asadoc-%:
+	@mkdir -p .bin
+	@echo "Downloading asadoc $*..."
+	@curl -sSfL -o $@.tar.gz https://github.com/omertuc/asadoc/releases/download/$*/asadoc-$$(uname -m)-unknown-linux-musl.tar.gz \
+		|| { rm -f $@.tar.gz; echo "Couldn't download asadoc $* for $$(uname -m): see https://github.com/omertuc/asadoc/releases"; exit 1; }
+	@tar -xzOf $@.tar.gz asadoc > $@.tmp && rm $@.tar.gz && chmod +x $@.tmp && mv $@.tmp $@
+
+.PHONY: check-doc-drift
+check-doc-drift: $(filter .bin/%,$(ASADOC)) ## Check every DPF docs code block comes from this repo (needs ../openshift-docs)
+	@$(ASADOC) check
+
 .PHONY: validate-env-files
 validate-env-files:
 	@$(ENV_SCRIPT) validate-env-files
@@ -570,6 +586,7 @@ help:
 	@echo "  verify-workers        - Wait for worker nodes to be Ready in host cluster"
 	@echo "  verify-dpu-nodes      - Wait for DPU nodes to be Ready in DPUCluster"
 	@echo "  verify-dpudeployment  - Wait for DPUDeployment to be Ready"
+	@echo "  check-doc-drift       - Check every DPF docs code block comes from this repo (asadoc)"
 	@echo ""
 	@echo "E2E Tests:"
 	@echo "  test-go-e2e            - Run Go e2e tests (E2E_GO_LABEL_FILTER=dpudeployment-lifecycle)"

@@ -1,0 +1,1 @@
+$ envsubst < bmc-secret.yaml | oc apply -f -

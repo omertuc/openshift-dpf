@@ -1,4 +1,5 @@
 ---
+# @docs-as-code: start section "configuring-required-operators"
 apiVersion: argoproj.io/v1beta1
 kind: ArgoCD
 metadata:
@@ -33,3 +34,4 @@ spec:
       openShiftOAuth: true
   notifications:
     enabled: false
+# @docs-as-code: end section "configuring-required-operators"

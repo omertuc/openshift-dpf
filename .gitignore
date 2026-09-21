@@ -67,3 +67,6 @@ V25.7-FINAL-SUMMARY.md
 verify-v25.7.sh
 	
 .vscode/
+
+# Tools downloaded by the Makefile (asadoc)
+.bin/

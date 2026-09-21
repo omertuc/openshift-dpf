@@ -1,0 +1,1 @@
+$ oc logs -n dpf-operator-system -l dpu.nvidia.com/component=dpf-provisioning-controller-manager --tail=-1 -f | grep <dpu_name>

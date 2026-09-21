@@ -1,0 +1,1 @@
+$ oc get secret $HOSTED_CLUSTER_NAME-admin-kubeconfig -n $CLUSTERS_NAMESPACE -o jsonpath='{.data.kubeconfig}' | base64 -d > $HOSTED_CLUSTER_NAME.kubeconfig

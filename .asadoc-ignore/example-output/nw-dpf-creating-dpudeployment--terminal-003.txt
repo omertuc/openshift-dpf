@@ -1,0 +1,2 @@
+NAME            READY   PHASE     AGE
+dpudeployment   False   Pending   2m32s

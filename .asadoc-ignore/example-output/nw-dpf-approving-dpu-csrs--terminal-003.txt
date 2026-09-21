@@ -1,0 +1,2 @@
+certificatesigningrequest.certificates.k8s.io/csr-6jx22 approved
+certificatesigningrequest.certificates.k8s.io/csr-tb6nd approved

@@ -1,0 +1,2 @@
+$ oc wait --for=condition=DPUIPAMObjectReconciled \
+  --namespace dpf-operator-system dpuserviceipam --all

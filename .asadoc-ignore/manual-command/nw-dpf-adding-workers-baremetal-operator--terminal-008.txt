@@ -1,0 +1,1 @@
+$ envsubst < baremetalhost.yaml | oc apply -f -

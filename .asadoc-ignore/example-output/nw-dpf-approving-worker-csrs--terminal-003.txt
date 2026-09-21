@@ -1,0 +1,4 @@
+certificatesigningrequest.certificates.k8s.io/csr-27bgq approved
+certificatesigningrequest.certificates.k8s.io/csr-69g65 approved
+certificatesigningrequest.certificates.k8s.io/csr-7r862 approved
+certificatesigningrequest.certificates.k8s.io/csr-f5vk7 approved

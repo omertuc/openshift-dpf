@@ -1,0 +1,1 @@
+dpfhcpprovisioner.provisioning.dpu.hcp.io/dpf-hosted condition met

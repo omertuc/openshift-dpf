@@ -1,0 +1,1 @@
+$ oc create namespace dpf-operator-system

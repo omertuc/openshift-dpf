@@ -1,0 +1,10 @@
+{
+  "name": "host-worker1",
+  "capacity": "90",
+  "allocatable": "90"
+}
+{
+  "name": "host-worker2",
+  "capacity": "90",
+  "allocatable": "90"
+}

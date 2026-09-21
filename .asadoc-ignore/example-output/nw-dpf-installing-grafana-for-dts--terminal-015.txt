@@ -1,0 +1,2 @@
+NAME                             READY   STATUS    RESTARTS   AGE     IP             NODE            NOMINATED NODE   READINESS GATES
+grafana-deployment-7c8b9d-xyz12  1/1     Running   0          2m38s   10.128.0.45   master-node-1   <none>           <none>

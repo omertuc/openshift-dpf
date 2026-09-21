@@ -1,4 +1,5 @@
 ---
+# @docs-as-code: start section "installing-grafana-for-dts"
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDatasource
 metadata:
@@ -27,3 +28,4 @@ spec:
       timeInterval: "30s"
     secureJsonData:
       httpHeaderValue1: "Bearer ${token}"
+# @docs-as-code: end section "installing-grafana-for-dts"

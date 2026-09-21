@@ -1,0 +1,1 @@
+$ oc wait --for=condition=ready --namespace dpf-operator-system pods --all

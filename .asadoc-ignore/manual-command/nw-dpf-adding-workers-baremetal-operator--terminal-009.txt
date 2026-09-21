@@ -1,0 +1,1 @@
+$ oc get bmh -n openshift-machine-api -w

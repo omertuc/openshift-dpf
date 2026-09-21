@@ -1,0 +1,1 @@
+$ envsubst < dpfoperatorconfig.yaml | oc apply -f -

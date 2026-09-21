@@ -1,0 +1,2 @@
+$ oc patch mce multiclusterengine --type=json \
+    -p='[{"op":"add","path":"/spec/overrides/components/-","value":{"name":"hypershift","enabled":true}}]'

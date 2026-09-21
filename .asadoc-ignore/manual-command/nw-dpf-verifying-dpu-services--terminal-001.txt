@@ -1,0 +1,3 @@
+$ oc wait --for=condition=ApplicationsReconciled \
+  --namespace dpf-operator-system dpuservices \
+  -l svc.dpu.nvidia.com/owned-by-dpudeployment=dpf-operator-system_dpudeployment

@@ -1,0 +1,1 @@
+deployment "dpf-operator-controller-manager" successfully rolled out

@@ -1,0 +1,13 @@
+# https://github.com/omertuc/asadoc
+docs:
+  asciidoc:
+    git: https://github.com/openshift/openshift-docs
+    ref: f6bcce2b79f2d8d97fdbb170fa143dfebf198fa8
+    assemblies:
+      - networking/networking_operators/dpf_operator/dpf-environment-setup.adoc
+      - networking/networking_operators/dpf_operator/dpf-hosted-cluster-provisioning.adoc
+      - networking/networking_operators/dpf_operator/dpf-operator-installation.adoc
+      - networking/networking_operators/dpf_operator/dpf-validation-telemetry.adoc
+      - networking/networking_operators/dpf_operator/dpf-worker-nodes-provisioning.adoc
+links:
+  repo: https://github.com/rh-ecosystem-edge/openshift-dpf/blob/main/
