@@ -1,0 +1,7 @@
+$ helm upgrade --install dpf-operator dpf-repository/dpf-operator \
+    --namespace dpf-operator-system \
+    --version "${TAG}" \
+    --set kamajiEtcdDefrag.enabled=false \
+    --set isOpenshift=true \
+    --set enableNodeFeatureRules=false \
+    --wait

@@ -1,0 +1,9 @@
+interfaces:
+  - ipv4:
+      dhcp: true
+      enabled: true
+    mac-address: <xx:xx:xx:xx:xx:xx>
+    mtu: 1500 # Set to 1500 for standard MTU or 9000 for jumbo frames
+    name: <interface-name>
+    state: up
+    type: ethernet

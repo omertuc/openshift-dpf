@@ -1,0 +1,1 @@
+$ oc get dpucluster -n dpf-operator-system

@@ -1,0 +1,1 @@
+$ oc get dpuflavor -n dpf-operator-system

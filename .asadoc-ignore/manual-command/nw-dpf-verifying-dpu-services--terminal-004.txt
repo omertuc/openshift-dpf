@@ -1,0 +1,2 @@
+$ oc wait --for=condition=ServiceChainSetReconciled \
+  --namespace dpf-operator-system dpuservicechain --all

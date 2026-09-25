@@ -1,0 +1,2 @@
+NAME                HOST/PORT                               PATH   SERVICES      PORT      TERMINATION   WILDCARD
+dpf-grafana-route   dpf-grafana-route-dpf-operator-system.apps.cluster.example.com          dpf-grafana   grafana   edge          None

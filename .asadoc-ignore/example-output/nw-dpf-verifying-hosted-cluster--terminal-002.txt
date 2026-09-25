@@ -1,0 +1,2 @@
+NAME         PHASE          READY   HOSTEDCLUSTER   AGE
+dpf-hosted   Provisioning   False   dpf-hosted      2m

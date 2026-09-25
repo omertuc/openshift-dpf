@@ -1,0 +1,1 @@
+$ envsubst < dpfhcpprovisioner.yaml | oc apply -f -

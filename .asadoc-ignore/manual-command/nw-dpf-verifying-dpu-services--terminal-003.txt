@@ -1,0 +1,2 @@
+$ oc wait --for=condition=ServiceInterfaceSetReconciled \
+  --namespace dpf-operator-system dpuserviceinterface --all

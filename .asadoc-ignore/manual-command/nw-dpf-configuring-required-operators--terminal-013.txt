@@ -1,0 +1,1 @@
+$ oc get nodefeaturediscovery,nodefeaturerule -n openshift-nfd

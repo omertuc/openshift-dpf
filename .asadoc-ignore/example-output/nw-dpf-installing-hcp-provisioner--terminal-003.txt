@@ -1,0 +1,4 @@
+NAME: dpf-hcp-provisioner-operator
+LAST DEPLOYED: ...
+NAMESPACE: dpf-hcp-provisioner-system
+STATUS: deployed

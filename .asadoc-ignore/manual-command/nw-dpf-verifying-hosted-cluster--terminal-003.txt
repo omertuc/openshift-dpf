@@ -1,0 +1,2 @@
+$ oc wait dpfhcpprovisioner ${HOSTED_CLUSTER_NAME} -n ${CLUSTERS_NAMESPACE} \
+    --for=jsonpath='{.status.phase}'=Ready --timeout=30m

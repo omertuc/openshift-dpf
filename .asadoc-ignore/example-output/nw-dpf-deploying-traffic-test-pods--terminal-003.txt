@@ -1,0 +1,6 @@
+NAME                                               READY   STATUS    RESTARTS   AGE     IP             NODE               NOMINATED NODE   READINESS GATES
+traffic-test-master-7448bb5cc-mdftd                1/1     Running   0          2m10s   10.129.0.145   master-2           <none>           <none>
+traffic-test-worker-776486fb68-krz54               1/1     Running   0          2m10s   10.128.2.9     host-worker1       <none>           <none>
+traffic-test-worker-776486fb68-lz8vf               1/1     Running   0          2m10s   10.131.0.9     host-worker2       <none>           <none>
+traffic-test-worker-hostnetwork-596d569d99-cjpns   1/1     Running   0          2m10s   10.0.110.11    host-worker1       <none>           <none>
+traffic-test-worker-hostnetwork-596d569d99-x6m7r   1/1     Running   0          2m10s   10.0.110.12    host-worker2       <none>           <none>

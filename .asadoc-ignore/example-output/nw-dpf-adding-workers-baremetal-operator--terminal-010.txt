@@ -1,0 +1,7 @@
+NAME        STATE          CONSUMER   ONLINE   ERROR   AGE
+worker-01   registering               true             10s
+worker-01   inspecting                true             15s
+worker-01   preparing                 true             20s
+worker-01   available                 true             30s
+worker-01   provisioning              true             1m
+worker-01   provisioned               true             10m

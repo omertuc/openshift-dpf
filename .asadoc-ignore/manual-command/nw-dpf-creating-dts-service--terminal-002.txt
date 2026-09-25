@@ -1,0 +1,1 @@
+$ oc get dpuserviceconfiguration -n dpf-operator-system doca-telemetry-service

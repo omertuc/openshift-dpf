@@ -1,0 +1,2 @@
+$ oc -n dpf-operator-system get dpuservice \
+  -l svc.dpu.nvidia.com/dpudeployment-service=doca-telemetry-service

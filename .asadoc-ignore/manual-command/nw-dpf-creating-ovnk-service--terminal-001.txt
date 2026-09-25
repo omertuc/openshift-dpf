@@ -1,0 +1,1 @@
+$ envsubst < ovn-k.yaml | oc apply -f -

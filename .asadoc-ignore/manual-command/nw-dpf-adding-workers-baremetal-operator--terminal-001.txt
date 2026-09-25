@@ -1,0 +1,6 @@
+$ export BMC_IP=<bmc_ip_address>
+$ export BMC_USER=<bmc_username>
+$ export BMC_PASSWORD=<bmc_password>
+$ export WORKER_NAME=<worker_name>
+$ export BOOT_MAC=<management_interface_mac>
+$ export ROOT_DEVICE=<root_device_path>

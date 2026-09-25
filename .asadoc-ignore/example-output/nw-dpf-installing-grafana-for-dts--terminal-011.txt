@@ -1,0 +1,2 @@
+NAME                               READY   STATUS    RESTARTS   AGE
+grafana-operator-66d8c8c7b-xyz12   1/1     Running   0          5m42s

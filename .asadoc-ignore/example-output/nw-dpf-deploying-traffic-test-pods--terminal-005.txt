@@ -1,0 +1,7 @@
+NAME                                       TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)          AGE
+traffic-test-master                        ClusterIP   172.30.102.123   <none>        5000/TCP         13m
+traffic-test-master-nodeport               NodePort    172.30.98.22     <none>        5000:31368/TCP   13m
+traffic-test-worker                        ClusterIP   172.30.187.147   <none>        5000/TCP         13m
+traffic-test-worker-hostnetwork            ClusterIP   172.30.122.242   <none>        5000/TCP         13m
+traffic-test-worker-hostnetwork-nodeport   NodePort    172.30.122.214   <none>        5000:30209/TCP   13m
+traffic-test-worker-nodeport               NodePort    172.30.108.72    <none>        5000:32570/TCP   13m

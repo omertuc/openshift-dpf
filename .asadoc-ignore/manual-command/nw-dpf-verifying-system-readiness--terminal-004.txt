@@ -1,0 +1,2 @@
+$ oc get nodes -l 'node-role.kubernetes.io/worker,!node-role.kubernetes.io/control-plane' -o json | \
+  jq '.items[] | {name: .metadata.name, capacity: .status.capacity."openshift.io/bf3_vfs", allocatable: .status.allocatable."openshift.io/bf3_vfs"}'

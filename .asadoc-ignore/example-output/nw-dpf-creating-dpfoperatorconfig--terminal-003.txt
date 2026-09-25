@@ -1,0 +1,1 @@
+deployment "dpf-provisioning-controller-manager" successfully rolled out

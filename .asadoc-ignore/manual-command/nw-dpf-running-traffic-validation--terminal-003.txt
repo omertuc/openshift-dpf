@@ -1,0 +1,1 @@
+$ oc -n workload exec -it <worker_pod_name> -- nc -vz <service_cluster_ip> 5000

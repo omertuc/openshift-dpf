@@ -1,0 +1,1 @@
+$ envsubst < dpuflavor.yaml | oc apply -f -

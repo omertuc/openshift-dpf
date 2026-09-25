@@ -1,0 +1,1 @@
+$ oc get dpuservicenad mybrhbn -n dpf-operator-system

@@ -1,0 +1,1 @@
+$ oc rollout status deployment --namespace dpf-operator-system dpf-operator-controller-manager

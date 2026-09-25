@@ -1,0 +1,2 @@
+NAME         CONFIG                                                 UPDATED   UPDATING   DEGRADED   MACHINECOUNT   READYMACHINECOUNT   UPDATEDMACHINECOUNT   DEGRADEDMACHINECOUNT   AGE
+worker-dpu   rendered-worker-dpu-b4a44cc606c2ffcf07067d1e943a8758   True      False      False      0              0                   0                     0                      2m

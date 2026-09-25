@@ -1,0 +1,1 @@
+$ oc -n dpf-operator-system exec deploy/dpf-operator-controller-manager -- /dpfctl describe all --show-resources=dpuservice --grouping=false

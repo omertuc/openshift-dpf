@@ -1,0 +1,1 @@
+$ export KUBECONFIG=$HOSTED_CLUSTER_NAME.kubeconfig

@@ -1,0 +1,14 @@
+NAME                                                    READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                          1/1     Running   0          64m
+argocd-dex-server-9dd99cc6c-pkl6j                       1/1     Running   0          64m
+argocd-redis-6749d85f98-mw9rc                           1/1     Running   0          64m
+argocd-repo-server-5fd79d655c-9rl26                     1/1     Running   0          64m
+argocd-server-5cc4f69c45-hzgm9                          1/1     Running   0          64m
+bfb-registry                                            1/1     Running   0          98s
+dpf-nodesriovdeviceplugin-controller-7c7bb889f6-xk6nm   1/1     Running   0          107s
+dpf-operator-controller-manager-6969c6d8bc-4njxd        1/1     Running   0          4m54s
+dpf-provisioning-controller-manager-54b6bdc57f-69lr7    1/1     Running   0          109s
+dpf-provisioning-controller-manager-54b6bdc57f-fg9f6    1/1     Running   0          109s
+dpuservice-controller-manager-5d9c4f6f67-wsdzt          1/1     Running   0          108s
+maintenance-operator-68c794b549-pp2dp                   1/1     Running   0          74m
+static-cm-controller-manager-745c8fd7d5-n8d2z           1/1     Running   0          110s

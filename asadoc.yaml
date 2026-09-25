@@ -1,13 +1,13 @@
-# asadoc: every code block in these DPF docs must come from this repo (or be
-# listed in asadoc-ignored.yaml). Run `asadoc check`, `asadoc serve`, `asadoc guide`.
-# Install: cargo install --git https://github.com/omertuc/asadoc
-docs: ../openshift-docs
-assemblies:
-  - networking/networking_operators/dpf_operator/dpf-environment-setup.adoc
-  - networking/networking_operators/dpf_operator/dpf-hosted-cluster-provisioning.adoc
-  - networking/networking_operators/dpf_operator/dpf-operator-installation.adoc
-  - networking/networking_operators/dpf_operator/dpf-validation-telemetry.adoc
-  - networking/networking_operators/dpf_operator/dpf-worker-nodes-provisioning.adoc
+# https://github.com/omertuc/asadoc
+docs:
+  asciidoc:
+    git: https://github.com/openshift/openshift-docs
+    ref: main
+    assemblies:
+      - networking/networking_operators/dpf_operator/dpf-environment-setup.adoc
+      - networking/networking_operators/dpf_operator/dpf-hosted-cluster-provisioning.adoc
+      - networking/networking_operators/dpf_operator/dpf-operator-installation.adoc
+      - networking/networking_operators/dpf_operator/dpf-validation-telemetry.adoc
+      - networking/networking_operators/dpf_operator/dpf-worker-nodes-provisioning.adoc
 links:
   repo: https://github.com/rh-ecosystem-edge/openshift-dpf/blob/main/
-  docs: https://github.com/openshift/openshift-docs/blob/main/
