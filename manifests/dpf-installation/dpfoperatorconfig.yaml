@@ -1,9 +1,7 @@
 # @docs-as-code: file
-#   | param: "<NODES_MTU>"
+#   | param: "<*>"
 #   | param: "api.<CLUSTER_NAME>.<BASE_DOMAIN>"
 #   | param: "6443"
-#   | param: "<FLANNEL_CONFIG>"
-#   | param: "<SRIOV_DP_RESOURCE_PREFIX>"
 apiVersion: operator.dpu.nvidia.com/v1alpha1
 kind: DPFOperatorConfig
 metadata:

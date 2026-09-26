@@ -1,4 +1,5 @@
-# @docs-as-code: start section "dpuflavor-spec" | param: "<NUM_VFS>"
+# @docs-as-code: start section "dpuflavor-spec"
+#   | param: "<*>"
 apiVersion: provisioning.dpu.nvidia.com/v1alpha1
 kind: DPUFlavor
 metadata:

@@ -1,9 +1,5 @@
 # @docs-as-code: file
-#   | param: "<SRIOV_DP_CONFIG_CR_NAME>"
-#   | param: "<SRIOV_DP_MGMT_POOL_NAME>"
-#   | param: "<SRIOV_DP_CONFIG_NAME>"
-#   | param: "<NUM_VFS_END>"
-#   | param: "<PF1_REGULAR_VF_END>"
+#   | param: "<*>"
 apiVersion: noderesources.dpu.nvidia.com/v1alpha1
 kind: NodeSRIOVDevicePluginConfig
 metadata:

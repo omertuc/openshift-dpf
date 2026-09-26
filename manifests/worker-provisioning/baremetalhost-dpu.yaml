@@ -1,8 +1,5 @@
 # @docs-as-code: file
-#   | param: "<WORKER_NAME>"
-#   | param: "<BOOT_MAC>"
-#   | param: "<ROOT_DEVICE>"
-#   | param: "<BMC_IP>"
+#   | param: "<*>"
 apiVersion: metal3.io/v1alpha1
 kind: BareMetalHost
 metadata:

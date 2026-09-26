@@ -1,8 +1,5 @@
 # @docs-as-code: file
-#   | param: "<HOST_CLUSTER_API>"
-#   | param: "<NODES_MTU>"
-#   | param: "<VTEP_CIDR>"
-#   | param: "<DPU_HOST_CIDR>"
+#   | param: "<*>"
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUServiceConfiguration
 metadata:

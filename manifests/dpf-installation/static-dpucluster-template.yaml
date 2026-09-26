@@ -1,4 +1,5 @@
-# @docs-as-code: file | param: "<HOSTED_CLUSTER_NAME>"
+# @docs-as-code: file
+#   | param: "<*>"
 apiVersion: provisioning.dpu.nvidia.com/v1alpha1
 kind: DPUCluster
 metadata:
