@@ -1,0 +1,1 @@
+$ oc -n workload exec -it <worker_pod_name> -- ping -c 4 <target_pod_ip>

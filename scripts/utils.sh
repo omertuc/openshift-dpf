@@ -109,6 +109,7 @@ function wait_for_secret_with_data() {
 }
 
 # Returns 0 on success, 1 if secret missing (skip hosted checks), 2 on error.
+# TODO: HUMAN-REVIEW-028 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-028.md
 ensure_hosted_kubeconfig() {
     HOSTED_KUBECONFIG="${HOSTED_CLUSTER_NAME}.kubeconfig"
 

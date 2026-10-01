@@ -1,0 +1,1 @@
+deployment "dpuservice-controller-manager" successfully rolled out

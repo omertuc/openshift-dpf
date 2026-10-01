@@ -1,11 +1,14 @@
----
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-017 - Flagged for human review priority 6, see .asadoc/human-review/06-HUMAN-REVIEW-017.md"
+#   | param: "<*>"
+#   | remove-lines-starting-with: "startingCSV:"
+#   | TODO: "The code pins startingCSV to GITOPS_OPERATOR_VERSION where the docs take the channel head; drop the pin from the code, or document it"
 apiVersion: v1
 kind: Namespace
 metadata:
   name: openshift-gitops-operator
   labels:
     openshift.io/cluster-monitoring: "true"
-
 ---
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -14,7 +17,6 @@ metadata:
   namespace: openshift-gitops-operator
 spec:
   upgradeStrategy: Default
-
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -23,11 +25,6 @@ metadata:
   namespace: openshift-gitops-operator
 spec:
   channel: gitops-<GITOPS_OPERATOR_CHANNEL>
-  installPlanApproval: Automatic
-  name: openshift-gitops-operator
-  source: redhat-operators
-  sourceNamespace: openshift-marketplace
-  startingCSV: openshift-gitops-operator.<GITOPS_OPERATOR_VERSION>
   config:
     env:
     - name: ARGOCD_CLUSTER_CONFIG_NAMESPACES
@@ -36,3 +33,8 @@ spec:
       value: "cluster-admin"
     - name: SERVER_CLUSTER_ROLE
       value: "cluster-admin"
+  installPlanApproval: Automatic
+  name: openshift-gitops-operator
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  startingCSV: openshift-gitops-operator.<GITOPS_OPERATOR_VERSION>

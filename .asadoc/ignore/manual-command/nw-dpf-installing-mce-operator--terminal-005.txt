@@ -1,0 +1,1 @@
+$ oc wait multiclusterengine/mce --for=jsonpath='{.status.phase}'=Available --timeout=15m

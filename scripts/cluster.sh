@@ -163,6 +163,7 @@ function build_dns_yaml() {
 
 # Shared helper: appends DHCP NMState entries for a set of VMs.
 # Args: output_file vm_count vm_prefix mac_offset
+# TODO: HUMAN-REVIEW-015 - Flagged for human review priority 6, see .asadoc/human-review/06-HUMAN-REVIEW-015.md
 _generate_nmstate_dhcp_entries() {
     local output_file="$1"
     local count="$2"

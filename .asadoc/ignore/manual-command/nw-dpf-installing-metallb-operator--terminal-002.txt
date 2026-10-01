@@ -1,0 +1,2 @@
+$ oc wait crd/metallbs.metallb.io --for=create --timeout=10m
+$ oc wait crd/metallbs.metallb.io --for=condition=Established --timeout=5m

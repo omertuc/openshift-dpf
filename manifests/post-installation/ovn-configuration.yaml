@@ -1,3 +1,8 @@
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-018 - Flagged for human review priority 6, see .asadoc/human-review/06-HUMAN-REVIEW-018.md"
+#   | param: "<*>"
+#   | remove-lines-starting-with: "imagePullSecretName:"
+#   | TODO: "The docs do not set global.imagePullSecretName; add it to the docs if the OVN-Kubernetes DPU images need the DPF pull secret"
 apiVersion: svc.dpu.nvidia.com/v1alpha1
 kind: DPUServiceConfiguration
 metadata:
@@ -18,8 +23,8 @@ spec:
         mtu: <NODES_MTU>
         dpuManifests:
           kubernetesSecretName: "ovn-dpu"
-          vtepCIDR: "<VTEP_CIDR>"
-          hostCIDR: "<DPU_HOST_CIDR>"
+          vtepCIDR: <VTEP_CIDR>
+          hostCIDR: <DPU_HOST_CIDR>
           ipamPool: "pool1"
           ipamPoolType: "cidrpool"
           ipamVTEPIPIndex: 0

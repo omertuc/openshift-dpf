@@ -1,0 +1,3 @@
+$ oc get csv -n multicluster-engine
+$ oc wait crd/multiclusterengines.multicluster.openshift.io --for=create --timeout=10m
+$ oc wait crd/multiclusterengines.multicluster.openshift.io --for=condition=Established --timeout=5m

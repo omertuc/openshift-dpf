@@ -1,5 +1,9 @@
 # Maintenance Operator Chart configuration for OpenShift DPF
 # Based on doca-platform/deploy/helmfiles/values/maintenance-operator-chart.yaml
+# @code-as-a-doc: start section "maintenance-operator-values"
+#   | TODO: "HUMAN-REVIEW-008 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-008.md"
+#   | remove-lines-starting-with: "deploy: true"
+#   | TODO: "The code sets operatorConfig.deploy: true, which the docs don't; without it the chart may not create the MaintenanceOperatorConfig, so maxParallelOperations wouldn't apply. Add it to the docs, or drop it from the code if it's the chart default"
 operatorConfig:
   deploy: true
   maxParallelOperations: 60%
@@ -21,3 +25,4 @@ operator:
     - key: node-role.kubernetes.io/control-plane
       operator: Exists
       effect: NoSchedule
+# @code-as-a-doc: end section "maintenance-operator-values"

@@ -1,0 +1,2 @@
+$ oc wait crd/argocds.argoproj.io --for=create --timeout=10m
+$ oc wait crd/argocds.argoproj.io --for=condition=Established --timeout=5m

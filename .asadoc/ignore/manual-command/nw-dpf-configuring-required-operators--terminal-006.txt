@@ -1,0 +1,2 @@
+$ oc wait deployment argocd-redis -n dpf-operator-system \
+  --for=condition=Available --timeout=120s

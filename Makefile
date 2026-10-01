@@ -1,5 +1,8 @@
-# Include environment variables (skip for targets that don't need a .env)
-ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e help,$(MAKECMDGOALS)),)
+# Targets that work without a .env file. Every other target loads it.
+NO_ENV_TARGETS := generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e help check-doc-drift browse-doc-drift
+
+SKIP_ENV := $(filter $(NO_ENV_TARGETS),$(MAKECMDGOALS))
+ifndef SKIP_ENV
 include .env
 export
 endif
@@ -477,6 +480,31 @@ verify-dpu-nodes:
 verify-dpudeployment:
 	@$(VERIFY_SCRIPT) verify-dpudeployment
 
+# asadoc release used by check-doc-drift, downloaded into .bin/ on first use.
+# Use your own build instead with: make check-doc-drift ASADOC=asadoc
+ASADOC_VERSION ?= v0.8.3
+ASADOC ?= .bin/asadoc-$(ASADOC_VERSION)
+# CI passes --format=github for a job summary and annotations
+ASADOC_CHECK_FLAGS ?=
+# Release target triple for this machine, e.g. aarch64-apple-darwin on an Apple Silicon Mac
+ASADOC_TARGET ?= $(subst arm64,aarch64,$(shell uname -m))-$(if $(filter Darwin,$(shell uname -s)),apple-darwin,unknown-linux-musl)
+
+.bin/asadoc-%:
+	@mkdir -p .bin
+	@echo "Downloading asadoc $* for $(ASADOC_TARGET)..."
+	@curl -sSfL -o $@.tar.gz https://github.com/omertuc/asadoc/releases/download/$*/asadoc-$(ASADOC_TARGET).tar.gz \
+		|| { rm -f $@.tar.gz; echo "Couldn't download asadoc $* for $(ASADOC_TARGET): see https://github.com/omertuc/asadoc/releases"; exit 1; }
+	@tar -xzOf $@.tar.gz asadoc > $@.tmp && rm $@.tar.gz && chmod +x $@.tmp && mv $@.tmp $@
+
+
+.PHONY: check-doc-drift
+check-doc-drift: $(filter .bin/%,$(ASADOC))
+	@$(ASADOC) check $(ASADOC_CHECK_FLAGS)
+
+.PHONY: browse-doc-drift
+browse-doc-drift: $(filter .bin/%,$(ASADOC))
+	@$(ASADOC) serve
+
 .PHONY: validate-env-files
 validate-env-files:
 	@$(ENV_SCRIPT) validate-env-files
@@ -677,3 +705,7 @@ help:
 	@echo "  TFT_KUBECONFIG       - Path to cluster kubeconfig"
 	@echo "  TFT_SERVER_NODE      - K8s node name for server (default: from HBN_HOSTNAME_NODE1)"
 	@echo "  TFT_CLIENT_NODE      - K8s node name for client (default: from HBN_HOSTNAME_NODE2)"
+	@echo ""
+	@echo "Meta:"
+	@echo "  check-doc-drift  - Check for documentation drift"
+	@echo "  browse-doc-drift - Browse documentation drift "

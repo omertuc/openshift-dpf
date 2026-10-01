@@ -1,4 +1,6 @@
 ---
+# @code-as-a-doc: start section "dpuflavor-9000" | param: "<*>"
+#   | TODO: "HUMAN-REVIEW-034 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-034.md"
 apiVersion: provisioning.dpu.nvidia.com/v1alpha1
 kind: DPUFlavor
 metadata:
@@ -116,6 +118,7 @@ spec:
       # Patch br-ovn and br-dpu together
       _ovs-vsctl set Interface pbrovntobrdpu type=patch options:peer=pbrdputobrovn
       _ovs-vsctl set Interface pbrdputobrovn type=patch options:peer=pbrovntobrdpu
+  # @code-as-a-doc: end section "dpuflavor-9000"
 
   # openshift-dpf currently performs all three updates unconditionally via
   # dpu-fw-upgrade.sh (ignition).

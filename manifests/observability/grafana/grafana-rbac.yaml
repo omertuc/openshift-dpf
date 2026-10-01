@@ -1,4 +1,4 @@
----
+# @code-as-a-doc: file
 apiVersion: v1
 kind: ServiceAccount
 metadata:

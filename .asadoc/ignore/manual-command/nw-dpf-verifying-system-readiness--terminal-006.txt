@@ -1,0 +1,1 @@
+$ oc get dpuservices -n dpf-operator-system

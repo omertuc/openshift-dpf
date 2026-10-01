@@ -1,0 +1,23 @@
+# @code-as-a-doc: file | param: "<*>"
+#   | TODO: "HUMAN-REVIEW-025 - Flagged for human review priority 5, see .asadoc/human-review/05-HUMAN-REVIEW-025.md"
+---
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: pool1
+  namespace: dpf-operator-system
+spec:
+  ipv4Network:
+    network: <VTEP_CIDR>
+    gatewayIndex: 3
+    prefixSize: 29
+---
+apiVersion: svc.dpu.nvidia.com/v1alpha1
+kind: DPUServiceIPAM
+metadata:
+  name: loopback
+  namespace: dpf-operator-system
+spec:
+  ipv4Network:
+    network: "11.0.0.0/24"
+    prefixSize: 32

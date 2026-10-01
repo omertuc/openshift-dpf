@@ -1,0 +1,1 @@
+$ envsubst < dpuservice-nad.yaml | oc apply -f -

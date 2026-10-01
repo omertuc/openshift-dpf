@@ -1,0 +1,1 @@
+$ oc -n openshift-config-managed get configmap dpf-dts-console-dashboard

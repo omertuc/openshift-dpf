@@ -1,4 +1,6 @@
----
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-007 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-007.md"
+#   | TODO: "Docs add deployment.spec nodeSelector/tolerations pinning Grafana to control-plane nodes; add them here or drop them from the docs"
 apiVersion: grafana.integreatly.org/v1beta1
 kind: Grafana
 metadata:

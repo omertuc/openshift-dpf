@@ -1,0 +1,12 @@
+NAME                     READY   OPERATIONAL   PHASE                        AGE
+<node-name>-<dpu-id>             Unknown       Node Effect                  25s
+<node-name>-<dpu-id>             Unknown       Initialize Interface         26s
+<node-name>-<dpu-id>             Unknown       Config FW Parameters         28s
+<node-name>-<dpu-id>             Unknown       Prepare BFB                  28s
+<node-name>-<dpu-id>             Unknown       OS Installing                5m28s
+<node-name>-<dpu-id>             Unknown       DPU Config                   15m
+<node-name>-<dpu-id>             Unknown       Rebooting                    26m
+<node-name>-<dpu-id>             Unknown       Host Network Configuration   27m
+<node-name>-<dpu-id>             False         DPU Cluster Config           64m
+<node-name>-<dpu-id>             Unknown       Node Effect Removal          71m
+<node-name>-<dpu-id>     True    True          Ready                        71m

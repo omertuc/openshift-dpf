@@ -1,4 +1,5 @@
----
+# @code-as-a-doc: file | remove-lines-starting-with: "#"
+#   | TODO: "Only drops the header comment; an asadoc option to skip a leading comment block would be narrower"
 # Native OpenShift Console dashboard for DOCA Telemetry Service (DTS).
 #
 # This renders under the OCP console: Observe -> Dashboards -> "DOCA DPU

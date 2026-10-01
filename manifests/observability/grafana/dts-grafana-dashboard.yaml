@@ -1,4 +1,6 @@
----
+# @code-as-a-doc: file | remove-lines-starting-with: "#"
+#   | TODO: "HUMAN-REVIEW-031 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-031.md"
+#   | TODO: "Only drops the header comment; an asadoc option to skip a leading comment block would be narrower"
 # DOCA Telemetry Service (DTS) — DPU hardware telemetry dashboard.
 #
 # Config-only addition to the existing dpf-grafana stack. The DTS DPUService

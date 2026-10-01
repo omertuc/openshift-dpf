@@ -1,3 +1,4 @@
+# @code-as-a-doc: file
 apiVersion: multicluster.openshift.io/v1
 kind: MultiClusterEngine
 metadata:

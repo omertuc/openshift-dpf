@@ -1,4 +1,5 @@
----
+# @code-as-a-doc: file | param: "<*>"
+#   | TODO: "HUMAN-REVIEW-029 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-029.md"
 apiVersion: metal3.io/v1alpha1
 kind: BareMetalHost
 metadata:
@@ -7,14 +8,14 @@ metadata:
 spec:
   online: true
   bootMACAddress: <BOOT_MAC>
+  rootDeviceHints:
+    deviceName: <ROOT_DEVICE>
   bmc:
     address: redfish-virtualmedia+https://<BMC_IP>
     credentialsName: <WORKER_NAME>-bmc-secret
     disableCertificateVerification: true
   customDeploy:
     method: install_coreos
-  rootDeviceHints:
-    deviceName: <ROOT_DEVICE>
   userData:
     name: worker-user-data-managed
     namespace: openshift-machine-api

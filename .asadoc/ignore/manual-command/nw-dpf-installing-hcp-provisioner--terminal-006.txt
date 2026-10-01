@@ -1,0 +1,1 @@
+$ oc get dpfhcpprovisionerconfigs.provisioning.dpu.hcp.io default -o yaml

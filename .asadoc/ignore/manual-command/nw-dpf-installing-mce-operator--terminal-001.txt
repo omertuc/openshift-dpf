@@ -1,0 +1,2 @@
+$ oc get packagemanifests -n openshift-marketplace -l catalog=redhat-operators \
+  -o jsonpath='{.items[?(@.metadata.name=="multicluster-engine")].status.channels[*].name}{"\n"}'

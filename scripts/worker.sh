@@ -388,6 +388,7 @@ provision_all_workers() {
     log "INFO" "Worker provisioning initiated"
 }
 
+# TODO: HUMAN-REVIEW-021 - Flagged for human review priority 5, see .asadoc/human-review/05-HUMAN-REVIEW-021.md
 approve_worker_csrs() {
     get_kubeconfig
     # Approve all pending CSRs - simple and effective for worker provisioning

@@ -1,3 +1,10 @@
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-005 - Flagged for human review priority 9, see .asadoc/human-review/09-HUMAN-REVIEW-005.md"
+#   | param: "sriov-test-*"
+#   | param: "quay.io/wabouham/ecosys-nvidia/nicolaka-netshoot:latest"
+#   | TODO: "Docs name the resources traffic-test-*; renaming sriov-test-* here (and in test/e2e, test/manifests, dpf-sanity-checks.sh) would drop the sriov-test-* param"
+#   | TODO: "Docs use the upstream nicolaka/netshoot image; using it here, or a non-personal mirror the docs could reference, would drop the image param"
+#   | TODO: "Docs set replicas: 1 on the worker Deployments but their sample output shows two worker pods; code uses 2. Fix the docs (e.g. replicas = number of host workers)"
 # 1. Namespace
 ---
 apiVersion: v1

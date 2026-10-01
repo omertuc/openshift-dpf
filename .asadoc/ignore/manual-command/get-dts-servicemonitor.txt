@@ -1,0 +1,1 @@
+$ oc -n dpf-operator-system get servicemonitor doca-telemetry-service-monitor

@@ -1,0 +1,1 @@
+$ oc get mcp worker-dpu

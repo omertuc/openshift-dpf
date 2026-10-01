@@ -1,6 +1,5 @@
-# Namespace-wide privileged SCC binding for dpf-operator-system on the hosted
-# (DPU) cluster.
-
+# @code-as-a-doc: file
+#   | comment: "Namespace-wide privileged SCC binding for dpf-operator-system on the hosted (DPU) cluster."
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

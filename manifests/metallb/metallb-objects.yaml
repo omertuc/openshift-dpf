@@ -1,3 +1,4 @@
+# @code-as-a-doc: file
 apiVersion: metallb.io/v1beta1
 kind: MetalLB
 metadata:

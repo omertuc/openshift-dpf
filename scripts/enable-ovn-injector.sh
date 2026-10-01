@@ -25,33 +25,10 @@ INJECTOR_METRICS_PORT=29091
 
 log [INFO] "Enabling OVN resource injector (chart ${INJECTOR_CHART_VERSION})..."
 
-# --take-ownership: leftover injector objects (SA, etc.) often remain after the
-# helm secret is gone. Without this, install fails with missing
-# meta.helm.sh/release-name on ovn-kubernetes-ovn-kubernetes-resource-injector.
-helm_args=(
-    upgrade --install -n "${OVNK_NAMESPACE}" ovn-kubernetes
-    "${OVN_CHART_URL}/ovn-kubernetes-chart"
-    --version "${INJECTOR_CHART_VERSION}"
-    --take-ownership
-    --set ovn-kubernetes-resource-injector.enabled=true
-    --set ovn-kubernetes-resource-injector.resourceName="${INJECTOR_RESOURCE_NAME}"
-    --set ovn-kubernetes-resource-injector.prioritizeOffloading=false
-    --set ovn-kubernetes-resource-injector.controllerManager.hostNetwork=true
-    --set ovn-kubernetes-resource-injector.controllerManager.webhookPort="${INJECTOR_WEBHOOK_PORT}"
-    --set ovn-kubernetes-resource-injector.controllerManager.healthProbeBindAddress=":${INJECTOR_HEALTH_PROBE_PORT}"
-    --set ovn-kubernetes-resource-injector.controllerManager.webhook.image.pullPolicy=IfNotPresent
-    --set "ovn-kubernetes-resource-injector.controllerManager.webhook.args={--leader-elect,--metrics-bind-address=:${INJECTOR_METRICS_PORT}}"
-    --set-json 'ovn-kubernetes-resource-injector.runtimeClassMappings=[]'
-    --set nodeWithDPUManifests.enabled=false
-    --set nodeWithoutDPUManifests.enabled=false
-    --set dpuManifests.enabled=false
-    --set controlPlaneManifests.enabled=false
-    --set commonManifests.enabled=false
-)
-
+kata_args=()
 if [ "${KATA_ENABLED}" = "true" ]; then
     log [INFO] "KATA_ENABLED=true: adding runtime class mapping ${KATA_RUNTIME_CLASS} -> ${KATA_NAD_NAME} (${KATA_INJECTOR_RESOURCE_NAME})"
-    helm_args+=(
+    kata_args=(
         --set "ovn-kubernetes-resource-injector.runtimeClassMappings[0].runtimeClass=${KATA_RUNTIME_CLASS}"
         --set "ovn-kubernetes-resource-injector.runtimeClassMappings[0].nadName=${KATA_NAD_NAME}"
         --set "ovn-kubernetes-resource-injector.runtimeClassMappings[0].resourceName=${KATA_INJECTOR_RESOURCE_NAME}"
@@ -60,7 +37,46 @@ else
     log [INFO] "KATA_ENABLED=${KATA_ENABLED:-false}: skipping kata runtime class mapping"
 fi
 
-if ! helm "${helm_args[@]}"; then
+# --take-ownership: leftover injector objects (SA, etc.) often remain after the
+# helm secret is gone. Without this, install fails with missing
+# meta.helm.sh/release-name on ovn-kubernetes-ovn-kubernetes-resource-injector.
+# kata_args must come after the --set-json that resets runtimeClassMappings.
+# @code-as-a-doc: start section "ovn-injector-helm-install"
+#   | TODO: "HUMAN-REVIEW-006 - Flagged for human review priority 9, see .asadoc/human-review/09-HUMAN-REVIEW-006.md"
+#   | doc strip-line-prefix: "$ "
+#   | remove-prefix: "if ! " | remove-suffix: "; then"
+#   | comment: "if !/then wrap the command only to log a clear error on failure"
+#   | remove-lines-starting-with: "--take-ownership"
+#   | TODO: "--take-ownership is missing from the doc; without it the doc command fails over leftover injector objects (see the comment above). Add it to the doc?"
+#   | remove-lines-starting-with: "--set-json"
+#   | remove-lines-starting-with: "\"${kata_args"
+#   | comment: "runtimeClassMappings reset and kata_args are Kata support the doc does not cover"
+#   | doc remove-lines-starting-with: "--skip-crds"
+#   | TODO: "The doc passes --skip-crds, the code does not. Decide which is right and align the other side, then drop this option"
+#   | reindent: 4 -> 2
+#   | comment: "Continuation lines follow the script's 4-space indentation; the doc uses 2"
+#   | param: "\"${*}\"" | param: "${*}"
+#   | comment: "The quoted param covers the doc's unquoted -n openshift-ovn-kubernetes"
+if ! helm upgrade --install -n "${OVNK_NAMESPACE}" ovn-kubernetes \
+    "${OVN_CHART_URL}/ovn-kubernetes-chart" \
+    --version "${INJECTOR_CHART_VERSION}" \
+    --take-ownership \
+    --set ovn-kubernetes-resource-injector.enabled=true \
+    --set ovn-kubernetes-resource-injector.resourceName="${INJECTOR_RESOURCE_NAME}" \
+    --set ovn-kubernetes-resource-injector.prioritizeOffloading=false \
+    --set ovn-kubernetes-resource-injector.controllerManager.hostNetwork=true \
+    --set ovn-kubernetes-resource-injector.controllerManager.webhookPort="${INJECTOR_WEBHOOK_PORT}" \
+    --set ovn-kubernetes-resource-injector.controllerManager.healthProbeBindAddress=":${INJECTOR_HEALTH_PROBE_PORT}" \
+    --set ovn-kubernetes-resource-injector.controllerManager.webhook.image.pullPolicy=IfNotPresent \
+    --set "ovn-kubernetes-resource-injector.controllerManager.webhook.args={--leader-elect,--metrics-bind-address=:${INJECTOR_METRICS_PORT}}" \
+    --set-json 'ovn-kubernetes-resource-injector.runtimeClassMappings=[]' \
+    "${kata_args[@]}" \
+    --set nodeWithDPUManifests.enabled=false \
+    --set nodeWithoutDPUManifests.enabled=false \
+    --set dpuManifests.enabled=false \
+    --set controlPlaneManifests.enabled=false \
+    --set commonManifests.enabled=false; then
+    # @code-as-a-doc: end section "ovn-injector-helm-install"
     log [ERROR] "Helm deployment of OVN resource injector failed"
     exit 1
 fi

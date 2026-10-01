@@ -1,3 +1,4 @@
+# TODO: HUMAN-REVIEW-001 - Flagged for human review priority 10, see .asadoc/human-review/10-HUMAN-REVIEW-001.md
 ---
 apiVersion: v1
 kind: Namespace

@@ -1,3 +1,5 @@
+# @code-as-a-doc: file | remove-lines-starting-with: "#"
+#   | TODO: "Only drops the header comment; an asadoc option to skip a leading comment block would be narrower"
 # ServiceMonitor for doca-telemetry-service (DTS) metrics
 # Discovers DTS services dynamically using relabeling to match any service
 # whose dpuservice-name label starts with "doca-telemetry-service",

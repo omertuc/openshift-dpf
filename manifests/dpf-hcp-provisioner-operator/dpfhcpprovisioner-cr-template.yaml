@@ -1,3 +1,14 @@
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-026 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-026.md"
+#   | TODO: "HUMAN-REVIEW-012 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-012.md"
+#   | param: "<*>"
+#   | remove-lines-starting-with: "#"
+#   | remove-blank-lines
+#   | remove-lines-starting-with: "machineOSURL:"
+#   | remove-lines-starting-with: "controlPlaneAvailabilityPolicy:"
+#   | TODO: "remove-lines-starting-with '#' and remove-blank-lines only drop the template's explanatory comments and spacing; asadoc could ignore YAML comments/blank lines on the code side by default"
+#   | TODO: "The docs say the operator resolves the BlueField OCP layer from DPFHCPProvisionerConfig.blueFieldOCPLayerRepo; drop machineOSURL from the template if CI no longer needs to pin a specific image, or document it as an optional override"
+#   | TODO: "The docs list controlPlaneAvailabilityPolicy only as an optional field (default HighlyAvailable); the code sets it from VM_COUNT, so the docs example would need to show it to drop this option"
 apiVersion: provisioning.dpu.hcp.io/v1alpha1
 kind: DPFHCPProvisioner
 metadata:
@@ -36,3 +47,6 @@ spec:
 
   # Control plane availability policy
   controlPlaneAvailabilityPolicy: <CONTROL_PLANE_POLICY>
+
+  # Virtual IP for LoadBalancer (removed when HYPERSHIFT_API_IP is unset)
+  virtualIP: <HYPERSHIFT_API_IP>

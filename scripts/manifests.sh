@@ -280,12 +280,13 @@ prepare_dpf_manifests() {
     # For OCP >= 4.22, Hypershift handles node CIDR allocation natively so
     # the dpu-node-ipam-controller is not deployed.  Instead, tell DPF's
     # Flannel the cluster CIDR that the provisioner operator configures on
-    # the HostedCluster.
-    local flannel_config=""
+    # the HostedCluster.  For older versions, drop the flannel block from the
+    # template.
+    local flannel_replacement=("<FLANNEL_POD_CIDR>" "${FLANNEL_POD_CIDR}")
     if ocp_version_gte "${OPENSHIFT_VERSION}" "4.22"; then
         log "INFO" "OCP ${OPENSHIFT_VERSION} >= 4.22: setting flannel podCIDR to ${FLANNEL_POD_CIDR}"
-        flannel_config="flannel:
-    podCIDR: ${FLANNEL_POD_CIDR}"
+    else
+        flannel_replacement=($'  flannel:\n    podCIDR: <FLANNEL_POD_CIDR>' "")
     fi
 
     update_file_multi_replace \
@@ -294,7 +295,7 @@ prepare_dpf_manifests() {
         "<CLUSTER_NAME>" "$CLUSTER_NAME" \
         "<BASE_DOMAIN>" "$BASE_DOMAIN" \
         "<SRIOV_DP_RESOURCE_PREFIX>" "$SRIOV_DP_RESOURCE_PREFIX" \
-        "<FLANNEL_CONFIG>" "$flannel_config" \
+        "${flannel_replacement[@]}" \
         "<NODES_MTU>" "$NODES_MTU"
 
     # Final verification: ensure no Helm values files are in the generated directory

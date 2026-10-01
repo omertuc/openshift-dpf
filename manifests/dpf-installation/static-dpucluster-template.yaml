@@ -1,3 +1,5 @@
+# @code-as-a-doc: file
+#   | param: "<*>"
 apiVersion: provisioning.dpu.nvidia.com/v1alpha1
 kind: DPUCluster
 metadata:

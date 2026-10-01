@@ -1,0 +1,1 @@
+$ oc get route -n dpf-operator-system

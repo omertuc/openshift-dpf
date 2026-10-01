@@ -1,3 +1,9 @@
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-024 - Flagged for human review priority 5, see .asadoc/human-review/05-HUMAN-REVIEW-024.md"
+#   | param: "<*>"
+#   | remove-lines-starting-with: "<KATA_*>"
+#   | comment: "The KATA_SRIOV_POOL line expands to the optional kata VF pool (KATA_ENABLED=true), which the docs do not cover"
+#   | TODO: "Propose an asadoc option for placeholder lines that may expand to nothing, so optional blocks need no removal"
 apiVersion: noderesources.dpu.nvidia.com/v1alpha1
 kind: NodeSRIOVDevicePluginConfig
 metadata:

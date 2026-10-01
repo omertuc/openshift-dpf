@@ -1,3 +1,14 @@
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-013 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-013.md"
+#   | param: "<*>"
+#   | param: "api.<*>.<*>"
+#   | TODO: "Use a single HOST_CLUSTER_API placeholder for kubernetesAPIServerVIP (as ovn-configuration.yaml does) so the api. prefix needs no param"
+#   | param: "6443"
+#   | TODO: "The docs take the API server port from TARGETCLUSTER_API_SERVER_PORT; either parametrize the port here or hardcode 6443 in the docs"
+#   | remove-lines-starting-with: "#"
+#   | comment: "Drops the code's explanatory comments, which the docs do not carry"
+#   | remove-text: "  imagePullSecrets:\n    - dpf-pull-secret\n"
+#   | TODO: "The docs do not set imagePullSecrets; add dpf-pull-secret to the docs if DPF component images need it"
 apiVersion: operator.dpu.nvidia.com/v1alpha1
 kind: DPFOperatorConfig
 metadata:
@@ -9,25 +20,29 @@ spec:
   # Kamaji is permanently disabled - only Hypershift is supported
   kamajiClusterManager:
     disable: true
-  #Openshift multus is used for DPU cluster 
+  # OpenShift multus is used for DPU cluster
   multus:
     disable: true
   cniInstaller:
     # CNI installer isn't relevant for the OpenShift use case.
     # In 25.10 it does not support the RHCOS BFB.
     disable: true
+  networking:
+    controlPlaneMTU: <NODES_MTU>      # management/OOB MTU (= NODES_MTU: 1500 standard, 9000 jumbo)
+    highSpeedMTU: <NODES_MTU>         # high-speed fabric MTU (= NODES_MTU; must match controlPlaneMTU)
+    dpuNodeOOBBridgeName: br-ex      # OOB bridge for DPU provisioning; br-ex on OpenShift
   overrides:
-    kubernetesAPIServerVIP: api.<CLUSTER_NAME>.<BASE_DOMAIN>
-    kubernetesAPIServerPort: 6443
     dpuCNIBinPath: /var/lib/cni/bin/
     dpuCNIPath: /run/multus/cni/net.d/
     # Configure lib64 path for RHCOS systems
     dpuOpenvSwitchSystemSharedLib64Path: /lib64
+    # When using OpenShift Multus (default), Flannel needs to install CNI config
+    flannelSkipCNIConfigInstallation: false
+    kubernetesAPIServerPort: 6443
+    kubernetesAPIServerVIP: api.<CLUSTER_NAME>.<BASE_DOMAIN>
     # Configure linker cache and opt library path for RHCOS systems
     dpuLinkerCachePath: /etc/ld.so.cache
     dpuOptLibraryPath: /usr/opt
-    # When using OpenShift Multus (default), Flannel needs to install CNI config
-    flannelSkipCNIConfigInstallation: false
   provisioningController:
     enableDynamicBFCFGTemplates: true
     hostAgentDNSPolicy: Default
@@ -39,11 +54,7 @@ spec:
     replicas: 1
   staticClusterManager:
     disable: false
-  <FLANNEL_CONFIG>
-  networking:
-    controlPlaneMTU: <NODES_MTU>
-    highSpeedMTU: <NODES_MTU>
-    dpuNodeOOBBridgeName: br-ex
   dpuServiceController:
     disableHostNetworkReadyNoExecuteTaints: false
-
+  flannel:
+    podCIDR: <FLANNEL_POD_CIDR>

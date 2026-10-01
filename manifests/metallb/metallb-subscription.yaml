@@ -1,4 +1,8 @@
-
+# @code-as-a-doc: file
+#   | TODO: "HUMAN-REVIEW-010 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-010.md"
+#   | param: "<*>"
+#   | remove-text: "# Create OperatorGroup\n(?s:.*?)---\n"
+#   | TODO: "The code also creates an OperatorGroup in metallb-system, which the docs don't; the Subscription is in openshift-operators, so it looks unused: drop it from the code, or add it to the docs"
 apiVersion: v1
 kind: Namespace
 metadata:

@@ -174,17 +174,30 @@ function deploy_dpf_hcp_provisioner_operator() {
         version_flag="--version ${DPF_HCP_PROVISIONER_OPERATOR_VERSION}"
     fi
 
+    # @code-as-a-doc: start section "dpf-hcp-provisioner-operator-install"
+    #   | TODO: "HUMAN-REVIEW-011 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-011.md"
+    #   | doc strip-line-prefix: "$ "
+    #   | remove-prefix: "if " | remove-suffix: "; then"
+    #   | unindent-common
+    #   | remove-lines-starting-with: "--disable-openapi-validation"
+    #   | remove-lines-starting-with: "--set image."
+    #   | param: "\"${DPF_HCP_PROVISIONER_OPERATOR_CHART_URL}\""
+    #   | param: "${**}"
+    #   | TODO: "${**} (over ${*}) is only for ${version_flag}, which stands for '--version <ver>'; an asadoc way to let just one param span whitespace would keep the others narrow"
+    #   | TODO: "The code pulls a dev chart and overrides the operator image (image.repository/pullPolicy/tag) where the docs use the released chart and image; drop the overrides once CI can use the released chart, or document them as optional"
+    #   | TODO: "Either drop --disable-openapi-validation from the code if no longer needed, or add it to the docs if users need it too"
     if helm upgrade --install dpf-hcp-provisioner-operator \
         "${DPF_HCP_PROVISIONER_OPERATOR_CHART_URL}" \
+        --registry-config "${OPENSHIFT_PULL_SECRET}" \
+        ${version_flag} \
         --namespace ${DPF_HCP_PROVISIONER_OPERATOR_NAMESPACE} \
         --create-namespace \
         --disable-openapi-validation \
-        --registry-config "${OPENSHIFT_PULL_SECRET}" \
-        ${version_flag} \
         --set image.repository=${DPF_HCP_PROVISIONER_OPERATOR_IMAGE_REPO} \
         --set image.pullPolicy=Always \
         --set image.tag=${DPF_HCP_PROVISIONER_OPERATOR_IMAGE_TAG} \
         --set provisionerConfig.manageDPUServiceTemplates=true; then
+    # @code-as-a-doc: end section "dpf-hcp-provisioner-operator-install"
 
         log [INFO] "Helm release 'dpf-hcp-provisioner-operator' deployed successfully"
         log [INFO] "DPF HCP Provisioner Operator deployment initiated. Use 'oc get pods -n ${DPF_HCP_PROVISIONER_OPERATOR_NAMESPACE}' to monitor progress."
@@ -209,13 +222,22 @@ function deploy_dpu_worker_config() {
         version_flag="--version ${DPU_WORKER_CONFIG_CHART_VERSION}"
     fi
 
+    # @code-as-a-doc: start section "dpu-worker-config-install"
+    #   | TODO: "HUMAN-REVIEW-022 - Flagged for human review priority 5, see .asadoc/human-review/05-HUMAN-REVIEW-022.md"
+    #   | doc strip-line-prefix: "$ "
+    #   | remove-prefix: "if " | remove-suffix: "; then"
+    #   | unindent-common
+    #   | param: "\"${DPU_WORKER_CONFIG_CHART_URL}\""
+    #   | param: "${**}"
+    #   | TODO: "${**} (over ${*}) is only for ${version_flag}, which stands for '--version <ver>'; an asadoc way to let just one param span whitespace would keep the others narrow"
     if helm upgrade --install dpu-worker-config \
         "${DPU_WORKER_CONFIG_CHART_URL}" \
+        ${version_flag} \
+        --registry-config "${OPENSHIFT_PULL_SECRET}" \
         --namespace ${DPF_HCP_PROVISIONER_OPERATOR_NAMESPACE} \
         --create-namespace \
-        --disable-openapi-validation \
-        --registry-config "${OPENSHIFT_PULL_SECRET}" \
-        ${version_flag}; then
+        --disable-openapi-validation; then
+    # @code-as-a-doc: end section "dpu-worker-config-install"
         log [INFO] "Helm release 'dpu-worker-config' deployed successfully"
     else
         log [ERROR] "Helm deployment of dpu-worker-config failed"
@@ -231,17 +253,32 @@ function create_dpfhcpprovisioner_secrets() {
 
     # Create pull-secret
     log [INFO] "Creating pull secret ${DPFHCPPROVISIONER_PULL_SECRET_NAME}..."
+    # @code-as-a-doc: start section "hcp-pull-secret"
+    #   | TODO: "HUMAN-REVIEW-027 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-027.md"
+    #   | doc strip-line-prefix: "$ "
+    #   | remove-suffix: " || true"
+    #   | unindent-common
+    #   | param: "${*}"
+    #   | TODO: "' || true' keeps reruns from failing on an existing secret; a check_secret_exists guard around the command instead would make remove-suffix unnecessary"
     oc create secret generic ${DPFHCPPROVISIONER_PULL_SECRET_NAME} \
         --from-file=.dockerconfigjson=${OPENSHIFT_PULL_SECRET} \
-        -n ${CLUSTERS_NAMESPACE} \
-        --type=Opaque || true
+        --type=Opaque \
+        -n ${CLUSTERS_NAMESPACE} || true
+    # @code-as-a-doc: end section "hcp-pull-secret"
 
     # Create SSH key secret
     log [INFO] "Creating SSH key secret ${DPFHCPPROVISIONER_SSH_SECRET_NAME}..."
+    # @code-as-a-doc: start section "hcp-ssh-key-secret"
+    #   | doc strip-line-prefix: "$ "
+    #   | remove-suffix: " || true"
+    #   | unindent-common
+    #   | param: "${*}"
+    #   | TODO: "' || true' keeps reruns from failing on an existing secret; a check_secret_exists guard around the command instead would make remove-suffix unnecessary"
     oc create secret generic ${DPFHCPPROVISIONER_SSH_SECRET_NAME} \
         --from-file=id_rsa.pub=${SSH_KEY} \
-        -n ${CLUSTERS_NAMESPACE} \
-        --type=Opaque || true
+        --type=Opaque \
+        -n ${CLUSTERS_NAMESPACE} || true
+    # @code-as-a-doc: end section "hcp-ssh-key-secret"
 
     log [INFO] "Secrets created successfully in ${CLUSTERS_NAMESPACE} namespace"
 }
@@ -285,16 +322,14 @@ function create_dpfhcpprovisioner_cr() {
         "<DPFHCPPROVISIONER_PULL_SECRET_NAME>" "${DPFHCPPROVISIONER_PULL_SECRET_NAME}" \
         "<DPFHCPPROVISIONER_SSH_SECRET_NAME>" "${DPFHCPPROVISIONER_SSH_SECRET_NAME}" \
         "<CONTROL_PLANE_POLICY>" "${control_plane_policy}" \
-        "<BLUEFIELD_OCP_IMAGE>" "${BLUEFIELD_OCP_IMAGE}"
+        "<BLUEFIELD_OCP_IMAGE>" "${BLUEFIELD_OCP_IMAGE}" \
+        "<HYPERSHIFT_API_IP>" "${HYPERSHIFT_API_IP}"
 
-    # Add virtualIP if HYPERSHIFT_API_IP is set
+    # Keep virtualIP only if HYPERSHIFT_API_IP is set
     if [ -n "${HYPERSHIFT_API_IP}" ]; then
-        cat >> "${cr_file}" << EOF
-
-  # Virtual IP for LoadBalancer
-  virtualIP: ${HYPERSHIFT_API_IP}
-EOF
         log [INFO] "Added virtualIP: ${HYPERSHIFT_API_IP} to DPFHCPProvisioner CR"
+    else
+        sed -i '/^  # Virtual IP for LoadBalancer/d; /^  virtualIP:/d' "${cr_file}"
     fi
 
     # Apply the DPFHCPProvisioner CR using apply_manifest
@@ -521,6 +556,12 @@ function deploy_maintenance_operator() {
     
     # Install Maintenance Operator
     log [INFO] "Installing Maintenance Operator chart..."
+    # @code-as-a-doc: start section "maintenance-operator-install"
+    #   | doc strip-line-prefix: "$ "
+    #   | unindent-common
+    #   | reindent: 4 -> 2
+    #   | param: "\"${HELM_CHARTS_DIR}/maintenance-operator-values.yaml\""
+    #   | param: "${*}"
     helm upgrade --install maintenance-operator oci://ghcr.io/mellanox/maintenance-operator-chart \
         --namespace dpf-operator-system \
         --create-namespace \
@@ -528,6 +569,7 @@ function deploy_maintenance_operator() {
         --version ${MAINTENANCE_OPERATOR_VERSION} \
         --values "${HELM_CHARTS_DIR}/maintenance-operator-values.yaml" \
         --wait
+    # @code-as-a-doc: end section "maintenance-operator-install"
     
     log [INFO] "Maintenance Operator deployment complete!"
 }
@@ -553,8 +595,12 @@ function apply_dpf() {
     deploy_maintenance_operator
 
     log "INFO" "Enabling IP forwarding for OVN Kubernetes..."
+    # @code-as-a-doc: start section "ip-forwarding-patch"
+    #   | doc strip-line-prefix: "$ "
+    #   | unindent-common
     oc patch network.operator.openshift.io cluster --type=merge -p \
-    '{"spec":{"defaultNetwork":{ "ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+      '{"spec":{"defaultNetwork":{"ovnKubernetesConfig":{"gatewayConfig":{"ipForwarding":"Global"}}}}}'
+    # @code-as-a-doc: end section "ip-forwarding-patch"
     
     deploy_nfd
     
@@ -618,6 +664,7 @@ function apply_dpf() {
     fi
 
     # Install without --wait for immediate feedback
+    # TODO: HUMAN-REVIEW-002 - Flagged for human review priority 9, see .asadoc/human-review/09-HUMAN-REVIEW-002.md
     if helm upgrade --install dpf-operator \
         "${CHART_URL}" \
         ${HELM_ARGS} \

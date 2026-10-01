@@ -29,7 +29,7 @@ mkdir -p "${GENERATED_POST_INSTALL_DIR}"
 # List of files that need special processing (excluded from direct copy)
 SPECIAL_FILES=(
     "bfb.yaml"
-    "hbn-ovn-ipam.yaml"
+    "dpuservice-ipam.yaml"
     "dpu-service-nads.yaml"
     "dpuflavor-1500.yaml"
     "dpuflavor-9000.yaml"
@@ -61,10 +61,10 @@ function update_hbn_ovn_manifests() {
         log [ERROR] "DPU_HOST_CIDR environment variable is not set. Please set it to the DPU nodes subnet (e.g., 10.6.135.0/24)"
         return 1
     fi
-    # Update hbn-ovn-ipam.yaml
+    # Update dpuservice-ipam.yaml
     update_file_multi_replace \
-        "${POST_INSTALL_DIR}/hbn-ovn-ipam.yaml" \
-        "${GENERATED_POST_INSTALL_DIR}/hbn-ovn-ipam.yaml" \
+        "${POST_INSTALL_DIR}/dpuservice-ipam.yaml" \
+        "${GENERATED_POST_INSTALL_DIR}/dpuservice-ipam.yaml" \
         "<VTEP_CIDR>" \
         "${VTEP_CIDR}"
 

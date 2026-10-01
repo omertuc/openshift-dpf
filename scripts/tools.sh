@@ -180,6 +180,7 @@ function install_hypershift_via_mce() {
         return 1
     fi
     log "INFO" "Waiting for MultiClusterEngine CRD..."
+    # TODO: HUMAN-REVIEW-032 - Flagged for human review priority 4, see .asadoc/human-review/04-HUMAN-REVIEW-032.md
     if ! retry 30 5 oc get crd multiclusterengines.multicluster.openshift.io &>/dev/null; then
         log "ERROR" "Timeout: MultiClusterEngine CRD is not available"
         return 1
@@ -196,6 +197,7 @@ function install_hypershift_via_mce() {
     mce_name=$(oc get multiclusterengine -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
     if [ -n "${mce_name}" ]; then
         log "INFO" "MultiClusterEngine ${mce_name} already exists. Ensuring hypershift is enabled..."
+        # TODO: HUMAN-REVIEW-016 - Flagged for human review priority 6, see .asadoc/human-review/06-HUMAN-REVIEW-016.md
         if ! retry 24 5 oc patch multiclusterengine "${mce_name}" --type=merge \
             -p '{"spec":{"overrides":{"components":[{"name":"hypershift","enabled":true}]}}}' ; then
             log "ERROR" "Failed to patch MultiClusterEngine ${mce_name} after retries"

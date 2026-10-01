@@ -1,3 +1,8 @@
+# @code-as-a-doc: start section "nfd-instance"
+#   | TODO: "HUMAN-REVIEW-009 - Flagged for human review priority 8, see .asadoc/human-review/08-HUMAN-REVIEW-009.md"
+#   | param: "api.<*>"
+#   | doc remove-text: "(?<=name: nfd)-instance"
+#   | TODO: "The docs name the NodeFeatureDiscovery nfd-instance, the code nfd; align them (renaming it in the code would leave a second NFD CR on existing clusters)"
 apiVersion: nfd.openshift.io/v1
 kind: NodeFeatureDiscovery
 metadata:
@@ -23,8 +28,11 @@ spec:
             - "vendor"
             - "device"
             - "class"
+# @code-as-a-doc: end section "nfd-instance"
 
 ---
+# TODO: Make the device IDs settable from the values
+# @code-as-a-doc: start section "dpu-detection-rule"
 apiVersion: nfd.openshift.io/v1alpha1
 kind: NodeFeatureRule
 metadata:
@@ -32,12 +40,19 @@ metadata:
   namespace: openshift-nfd
 spec:
   rules:
-    - name: "DPU-detection-rule"
-      labels:
-        "dpu-enabled": ""
+    - labels:
+        dpu-enabled: ""
       matchFeatures:
         - feature: pci.device
           matchExpressions:
-            vendor: {op: In, value: ["15b3"]}
-            # TODO: Make this settable from the values
-            device: {op: In, value:  ["a2d6", "a2dc"] }
+            device:
+              op: In
+              value:
+                - a2d6
+                - a2dc
+            vendor:
+              op: In
+              value:
+                - 15b3
+      name: DPU-detection-rule
+# @code-as-a-doc: end section "dpu-detection-rule"

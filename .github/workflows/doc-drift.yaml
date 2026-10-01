@@ -1,0 +1,19 @@
+# Checks that code marked for asadoc still matches the OpenShift
+# DPF docs (see .asadoc/config.toml). The job summary shows how each doc block
+# differs from the code, and the PR diff is annotated on the code.
+name: Doc drift
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check-doc-drift:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: make check-doc-drift ASADOC_CHECK_FLAGS=--format=github

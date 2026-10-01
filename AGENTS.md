@@ -80,6 +80,7 @@ make help                 # List all targets with descriptions
 - All scripts use `set -e` and `set -o pipefail`.
 - Use `log "LEVEL" "message"` (from `utils.sh`) for output — levels: INFO, WARN, ERROR, DEBUG (DEBUG only shown when `DEBUG=true`).
 - Use `retry <attempts> <delay> <command>` for operations that may need retries.
+- Some manifests and scripts carry `# @code-as-a-doc:` markers: their marked content should stay almost identical to code blocks in the OpenShift DPF docs (see `.asadoc/config.toml`). After changing marked code, run `asadoc check` to check for drift.
 - Use `apply_manifest <file>` which skips if the resource already exists (pass `true` as second arg to force apply).
 - Use `check_*_exists()` helpers before creating resources (namespaces, CRDs, secrets, Helm releases).
 - Sensitive values (API keys, pull secrets) are redacted in logs by `update_file_multi_replace()`.

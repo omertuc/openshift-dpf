@@ -1,4 +1,4 @@
----
+# @code-as-a-doc: file | param: "<*>"
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -19,7 +19,7 @@ metadata:
   name: multicluster-engine
   namespace: multicluster-engine
 spec:
-  channel: "<MCE_OPERATOR_CHANNEL>"
+  channel: <MCE_OPERATOR_CHANNEL>
   name: multicluster-engine
   source: <CATALOG_SOURCE_NAME>
   sourceNamespace: openshift-marketplace
