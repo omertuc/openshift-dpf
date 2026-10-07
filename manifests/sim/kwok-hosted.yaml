@@ -1,0 +1,70 @@
+# kwok controller for the hosted (DPU) cluster. It runs in the management
+# cluster because the hosted cluster has no workers, and keeps the fake DPU
+# Nodes created by mock-dms Ready.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kwok-hosted
+  namespace: <NAMESPACE>
+data:
+  kwok.yaml: |
+    apiVersion: config.kwok.x-k8s.io/v1alpha1
+    kind: KwokConfiguration
+    options:
+      enablePodsOnNodeSyncStreamWatch: true
+      nodeLeaseParallelism: 4
+      podPlayStageParallelism: 4
+      nodePlayStageParallelism: 4
+      nodePort: 10247
+      cidr: 10.0.0.0/24
+      nodeLeaseDurationSeconds: 40
+      manageAllNodes: false
+      manageNodesWithAnnotationSelector: kwok.x-k8s.io/node=fake
+      enableCRDs:
+      - Stage
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kwok-hosted
+  namespace: <NAMESPACE>
+  labels:
+    app: kwok-hosted
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kwok-hosted
+  template:
+    metadata:
+      labels:
+        app: kwok-hosted
+    spec:
+      containers:
+      - name: kwok
+        image: registry.k8s.io/kwok/kwok:<KWOK_VERSION>
+        args:
+        - --config=/etc/kwok-config/kwok.yaml
+        - --kubeconfig=/etc/kwok/super-admin.conf
+        # The pod IP is in the cluster network the hosted cluster also uses,
+        # which its API server refuses as an endpoint address.
+        - --node-ip=$(HOST_IP)
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        volumeMounts:
+        - name: kubeconfig
+          mountPath: /etc/kwok
+          readOnly: true
+        - name: config
+          mountPath: /etc/kwok-config
+          readOnly: true
+      volumes:
+      - name: config
+        configMap:
+          name: kwok-hosted
+      - name: kubeconfig
+        secret:
+          secretName: <KUBECONFIG_SECRET>

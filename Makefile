@@ -1,5 +1,5 @@
 # Include environment variables (skip for targets that don't need a .env)
-ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e help,$(MAKECMDGOALS)),)
+ifeq ($(filter generate-env validate-env-files generate-env-test validate-env-test-files test-go-e2e help deploy-sim delete-sim-hosts,$(MAKECMDGOALS)),)
 include .env
 export
 endif
@@ -20,6 +20,7 @@ UTILS_SCRIPT := scripts/utils.sh
 POST_INSTALL_SCRIPT := scripts/post-install.sh
 CUSTOM_POSTINSTALL_RUNNER := scripts/custom-postinstall-script.sh
 VERIFY_SCRIPT := scripts/verify.sh
+SIM_SCRIPT := scripts/sim.sh
 ENV_SCRIPT := scripts/env.sh
 
 # Sanity tests script:
@@ -461,6 +462,14 @@ deploy-proxy:
 dump-system-status:
 	@$(UTILS_SCRIPT) dump-system-status "$(or $(REASON),manual)"
 
+.PHONY: deploy-sim
+deploy-sim:
+	@$(SIM_SCRIPT) deploy-sim
+
+.PHONY: delete-sim-hosts
+delete-sim-hosts:
+	@$(SIM_SCRIPT) delete-sim-hosts
+
 .PHONY: verify-deployment
 verify-deployment:
 	@VERIFY_DEPLOYMENT=true $(VERIFY_SCRIPT) verify-deployment
@@ -567,6 +576,8 @@ help:
 	@echo ""
 	@echo "Verification:"
 	@echo "  verify-deployment     - Full verification: workers + DPU nodes + DPUDeployment"
+	@echo "  deploy-sim            - Simulated DPUs: mock-dms + kwok + fake host Nodes (SIM_MOCK_DMS_IMAGE required)"
+	@echo "  delete-sim-hosts      - Delete the fake host Nodes"
 	@echo "  verify-workers        - Wait for worker nodes to be Ready in host cluster"
 	@echo "  verify-dpu-nodes      - Wait for DPU nodes to be Ready in DPUCluster"
 	@echo "  verify-dpudeployment  - Wait for DPUDeployment to be Ready"
