@@ -22,9 +22,12 @@ MANIFESTS_DIR="${MANIFESTS_DIR:-${SCRIPT_DIR}/../manifests}"
 DPF_OPERATOR_NAMESPACE="${DPF_OPERATOR_NAMESPACE:-dpf-operator-system}"
 SIM_DOCA_PLATFORM_DIR="${SIM_DOCA_PLATFORM_DIR:-${HOME}/repos/doca-platform}"
 SIM_MOCK_DMS_IMAGE="${SIM_MOCK_DMS_IMAGE:-}"
+SIM_DPU_IMAGE="${SIM_DPU_IMAGE:-}"
 SIM_NUM_HOSTS="${SIM_NUM_HOSTS:-2}"
 SIM_HOST_PREFIX="${SIM_HOST_PREFIX:-sim-host}"
 SIM_HOST_MCP="${SIM_HOST_MCP:-worker-dpu}"
+# m0: mock-dms creates a kwok DPU Node; m1: sim-dpu joins it from the real ignition
+SIM_LEVEL="${SIM_LEVEL:-m0}"
 SIM_DPU_NUM_SFS="${SIM_DPU_NUM_SFS:-64}"
 KWOK_VERSION="${KWOK_VERSION:-v0.8.0}"
 KWOK_RELEASE_URL="https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}"
@@ -101,6 +104,24 @@ deploy_mock_dms() {
 }
 
 # -----------------------------------------------------------------------------
+# sim-dpu (M1)
+# -----------------------------------------------------------------------------
+deploy_sim_dpu() {
+    if [[ -z "${SIM_DPU_IMAGE}" ]]; then
+        log "ERROR" "SIM_DPU_IMAGE must be set (repository:tag)"
+        return 1
+    fi
+    local secret
+    secret=$(get_dpucluster_kubeconfig_secret)
+    log "INFO" "Deploying sim-dpu ${SIM_DPU_IMAGE}"
+    sed -e "s|<NAMESPACE>|${DPF_OPERATOR_NAMESPACE}|g" \
+        -e "s|<KUBECONFIG_SECRET>|${secret}|g" \
+        -e "s|<SIM_DPU_IMAGE>|${SIM_DPU_IMAGE}|g" \
+        "${MANIFESTS_DIR}/sim/sim-dpu.yaml" | oc apply -f -
+    oc -n "${DPF_OPERATOR_NAMESPACE}" rollout status deployment/sim-dpu --timeout=300s
+}
+
+# -----------------------------------------------------------------------------
 # Fake host Nodes
 # -----------------------------------------------------------------------------
 create_sim_hosts() {
@@ -128,6 +149,7 @@ metadata:
     node-role.kubernetes.io/worker: ""
     node-role.kubernetes.io/${SIM_HOST_MCP}: ""
     dpf.openshift.io/sim-host: "true"
+    dpf.openshift.io/sim-level: ${SIM_LEVEL}
   annotations:
     kwok.x-k8s.io/node: fake
     provisioning.dpu.nvidia.com/override-dms-pod-name: ${mock_dms_pod}
@@ -206,10 +228,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         deploy-mock-dms)        deploy_mock_dms ;;
         create-sim-hosts)       create_sim_hosts ;;
         fake-dpu-node-state)    fake_dpu_node_state ;;
+        deploy-sim-dpu)         deploy_sim_dpu ;;
         delete-sim-hosts)       delete_sim_hosts ;;
         deploy-sim)             deploy_sim ;;
         *)
-            echo "Usage: $0 {deploy-sim|deploy-kwok-management|deploy-kwok-hosted|deploy-mock-dms|create-sim-hosts|fake-dpu-node-state|delete-sim-hosts}"
+            echo "Usage: $0 {deploy-sim|deploy-kwok-management|deploy-kwok-hosted|deploy-mock-dms|create-sim-hosts|fake-dpu-node-state|deploy-sim-dpu|delete-sim-hosts}"
             exit 1
             ;;
     esac

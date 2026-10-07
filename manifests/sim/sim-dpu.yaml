@@ -1,0 +1,75 @@
+# sim-dpu: joins simulated DPUs (hosts labeled dpf.openshift.io/sim-level=m1)
+# to the hosted cluster from the ignition DPF generated for them, and stands
+# in for sfc-controller on simulated DPU Nodes.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sim-dpu
+  namespace: <NAMESPACE>
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: sim-dpu
+rules:
+- apiGroups: [""]
+  resources: [nodes]
+  verbs: [get, list]
+- apiGroups: [provisioning.dpu.nvidia.com]
+  resources: [dpus]
+  verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: sim-dpu
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: sim-dpu
+subjects:
+- kind: ServiceAccount
+  name: sim-dpu
+  namespace: <NAMESPACE>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sim-dpu
+  namespace: <NAMESPACE>
+  labels:
+    app: sim-dpu
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sim-dpu
+  template:
+    metadata:
+      labels:
+        app: sim-dpu
+    spec:
+      serviceAccountName: sim-dpu
+      containers:
+      - name: sim-dpu
+        image: <SIM_DPU_IMAGE>
+        args:
+        - --namespace=<NAMESPACE>
+        - --bfb-registry=http://bfb-registry.<NAMESPACE>.svc:8082
+        - --hosted-kubeconfig=/etc/hosted/super-admin.conf
+        # Outside the hosted cluster network, which its API server refuses
+        # as an endpoint address.
+        - --node-ip=$(HOST_IP)
+        env:
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        volumeMounts:
+        - name: hosted-kubeconfig
+          mountPath: /etc/hosted
+          readOnly: true
+      volumes:
+      - name: hosted-kubeconfig
+        secret:
+          secretName: <KUBECONFIG_SECRET>
