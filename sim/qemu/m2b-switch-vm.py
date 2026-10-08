@@ -3,6 +3,9 @@
 BlueField-3 to DPF's host components: emulator -> qemu-kvm-bf3sim, the two igb
 NICs become functions 0 and 1 of one multifunction slot, and both get
 x-vpd-serial=<serial> (a BlueField's two PFs report the same serial).
+Function 0 also gets x-pcie-ari-nextfn-1: igb has an ARI capability, and
+with ARI the guest only finds the functions the ARI next-function chain
+names, which is just function 0 by default.
 
 Run on the hypervisor. Prints the new domain XML; define it with virsh.
 
@@ -58,6 +61,8 @@ def main(path, emulator, serial, mac0, mac1):
         dev = ET.SubElement(override, f"{{{QEMU_NS}}}device", {"alias": name})
         fe = ET.SubElement(dev, f"{{{QEMU_NS}}}frontend")
         ET.SubElement(fe, f"{{{QEMU_NS}}}property", {"name": "x-vpd-serial", "type": "string", "value": serial})
+        if name == "ua-bf3p0":
+            ET.SubElement(fe, f"{{{QEMU_NS}}}property", {"name": "x-pcie-ari-nextfn-1", "type": "bool", "value": "true"})
 
     tree.write(sys.stdout, encoding="unicode")
 
