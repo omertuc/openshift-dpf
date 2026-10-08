@@ -41,7 +41,9 @@ out="${M3_DIR}/${DPU}"
 mkdir -p "${out}"
 chmod 700 "${out}"
 curl -sSf -m 60 -o "${out}/bf.cfg" "${BFB_REGISTRY}${bfcfg}"
-python3 -I "${HERE}/dpu-ignition.py" --mgmt-mac "${MGMT_MAC}" ${SIM_WIRE_MAC:+--wire-mac "${SIM_WIRE_MAC}"} \
+host_node=$(oc get dpu -n "${NS}" "${DPU}" -o jsonpath='{.spec.dpuNodeName}')
+python3 -I "${HERE}/dpu-ignition.py" --mgmt-mac "${MGMT_MAC}" \
+    ${SIM_WIRE_MAC:+--wire-mac "${SIM_WIRE_MAC}" --host-node "${host_node}"} \
     "${out}/bf.cfg" "${out}/dpu.ign"
 python3 -I - "${out}/dpu.ign" "${SSH_PUBKEY}" <<'EOF'
 import json, sys

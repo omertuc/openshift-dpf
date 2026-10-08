@@ -33,3 +33,15 @@ for netdev in p0 p1; do
     done
     echo "${netdev}: ${dev} now reads $(cat "${dev}/device") with $(cat "${dev}/sriov_numvfs") VFs"
 done
+
+# The host PF p0 gets its address by DHCP from the DPU (M4), with the MAC
+# OVN-K's --simulate-dpu mode expects for the host gateway, derived from the
+# node name: 52:54:00 + sha256(<node>\0host)[0:2] + :00.
+node=$(hostname -s)
+h=$(printf '%s\0host' "${node}" | sha256sum)
+gw_mac="52:54:00:${h:0:2}:${h:2:2}:00"
+if ! nmcli -t -f NAME connection show | grep -qx p0; then
+    nmcli connection add type ethernet ifname p0 con-name p0 ipv4.method auto ipv4.never-default yes \
+        ipv4.dhcp-timeout 2147483647 ipv6.method disabled ethernet.cloned-mac-address "${gw_mac}" >/dev/null
+fi
+echo "p0: DHCP from the DPU as ${gw_mac}"

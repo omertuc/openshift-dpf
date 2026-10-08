@@ -6,7 +6,7 @@
 #
 # Host link (M4): with SIM_WIRE_MAC set (/etc/dpf/sim.env), the NIC with that
 # MAC is the BlueField's PCIe side, a VLAN trunk to the host's PFs: untagged
-# frames are the host PF (pf0hpf, alias rep0-0), VLAN 100+N host p0 VF N
+# frames are the host PF (rep0-0), VLAN 100+N host p0 VF N
 # (rep0-N), VLAN 200+N host p1 VF N (rep1-N). The host tags each VF's traffic
 # (ip link set p0 vf N vlan 100+N), so a VLAN-filtering bridge turns the
 # trunk into one netdev per representor. VF 0 is a BlueField's host<->DPU
@@ -33,10 +33,19 @@ veth() {
   ip link set "$2" up
 }
 
-# OVN-K's --simulate-dpu mode finds representors by name or alias: rep0-0 is
-# the host PF's (pf0hpf on a BlueField).
-veth pf0hpf pf0hpf-w
-ip link set pf0hpf alias rep0-0
+# The host PF's representor (pf0hpf on a BlueField). OVN-K's --simulate-dpu
+# mode wants it as an OVS port named rep0-0 and derives the host gateway MAC
+# from the host's node name instead of reading it; DPF's cniprovisioner (sim
+# mode) looks for a netdev named pf0hpf and serves the host PF its DHCP lease
+# by that MAC. So: rep0-0 is the OVS port, pf0hpf a dummy carrying the MAC,
+# and both use SIM_HOST_PF_MAC, the MAC the host PF is given.
+veth rep0-0 pf0hpf-w
+ip link show pf0hpf &>/dev/null || ip link add pf0hpf type dummy
+ip link set pf0hpf up
+if [[ -n "${SIM_HOST_PF_MAC:-}" ]]; then
+  ip link set rep0-0 address "${SIM_HOST_PF_MAC}"
+  ip link set pf0hpf address "${SIM_HOST_PF_MAC}"
+fi
 for pf in 0 1; do
   for vf in $(seq 1 $((SIM_NUM_VFS - 1))); do
     veth "rep${pf}-${vf}" "rep${pf}-${vf}w"
@@ -82,7 +91,7 @@ done
 _ovs-vsctl --may-exist add-br br-dpu -- set bridge br-dpu datapath_type=system
 _ovs-vsctl br-set-external-id br-dpu bridge-id br-dpu
 _ovs-vsctl br-set-external-id br-dpu bridge-uplink pbrdputobrovn
-_ovs-vsctl --may-exist add-port br-dpu pf0hpf -- set Interface pf0hpf type=system
+_ovs-vsctl --may-exist add-port br-dpu rep0-0 -- set Interface rep0-0 type=system
 
 # br-ovn sits between the sfc-controller managed br-sfc and OVN-K.
 _ovs-vsctl --may-exist add-br br-ovn -- set bridge br-ovn datapath_type=system

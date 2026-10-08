@@ -24,10 +24,14 @@ It also stands in for what the masked units and the BlueField itself set up:
   VLAN trunk that dpf-ovs-sim.sh splits into representors; NetworkManager
   leaves it and the representors alone
 
-usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] [--wire-mac MAC] <bf.cfg> <out.ign>
+- with --host-node, the MAC OVN-K's --simulate-dpu mode expects on the host
+  PF (52:54:00 + sha256(<host node>\0host)[0:2] + :00) goes into sim.env
+
+usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] [--wire-mac MAC [--host-node NAME]] <bf.cfg> <out.ign>
 """
 import argparse
 import base64
+import hashlib
 import os
 import gzip
 import json
@@ -96,7 +100,13 @@ def add_file(files, path, raw, mode=0o644):
     files.append({"path": path, "mode": mode, "overwrite": True, "contents": {"source": data_url(raw)}})
 
 
-def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None):
+def simulated_host_pf_mac(host_node):
+    """The host gateway MAC OVN-K's SimulatedDPUOps derives for index 0."""
+    h = hashlib.sha256(host_node.encode() + b"\x00host").digest()
+    return f"52:54:00:{h[0]:02x}:{h[1]:02x}:00"
+
+
+def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None, host_node=None):
     with open(bfcfg) as f:
         live = json.load(f)
     target = json.loads(file_contents(live, "/var/target.ign"))
@@ -125,7 +135,10 @@ def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None):
             units[i] = {"name": u["name"], "mask": True}
             masked.append(u["name"])
     if wire_mac:
-        add_file(files, "/etc/dpf/sim.env", f"SIM_WIRE_MAC={wire_mac}\n".encode())
+        env = f"SIM_WIRE_MAC={wire_mac}\n"
+        if host_node:
+            env += f"SIM_HOST_PF_MAC={simulated_host_pf_mac(host_node)}\n"
+        add_file(files, "/etc/dpf/sim.env", env.encode())
         add_file(files, "/etc/NetworkManager/conf.d/99-dpf-sim-unmanaged.conf",
                  ("[keyfile]\nunmanaged-devices=mac:" + wire_mac +
                   ";interface-name:dpuwire;interface-name:rep*;interface-name:pf0hpf-w\n").encode())
@@ -144,7 +157,8 @@ if __name__ == "__main__":
     p.add_argument("--mgmt-mac")
     p.add_argument("--mgmt-mtu", type=int, default=1500)
     p.add_argument("--wire-mac")
+    p.add_argument("--host-node")
     p.add_argument("bfcfg")
     p.add_argument("out")
     a = p.parse_args()
-    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu, a.wire_mac)
+    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu, a.wire_mac, a.host_node)
