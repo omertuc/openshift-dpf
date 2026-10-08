@@ -6,6 +6,12 @@
 # - fake host Nodes in the management cluster (kwok-controller in kube-system)
 # - fake DPU Nodes in the hosted cluster (kwok-hosted, runs in the management
 #   cluster because the hosted cluster has no workers)
+# Hosts are labeled dpf.openshift.io/sim-level (SIM_LEVEL):
+# - m0: mock-dms creates the DPU Node directly
+# - m1: sim-dpu joins it from the ignition DPF generated, through the DPF HCP
+#   provisioner's CSR approval
+# sim-dpu also stands in for the SF device plugin and sfc-controller on all
+# simulated DPU Nodes.
 
 set -e
 set -o pipefail
@@ -28,7 +34,6 @@ SIM_HOST_PREFIX="${SIM_HOST_PREFIX:-sim-host}"
 SIM_HOST_MCP="${SIM_HOST_MCP:-worker-dpu}"
 # m0: mock-dms creates a kwok DPU Node; m1: sim-dpu joins it from the real ignition
 SIM_LEVEL="${SIM_LEVEL:-m0}"
-SIM_DPU_NUM_SFS="${SIM_DPU_NUM_SFS:-64}"
 KWOK_VERSION="${KWOK_VERSION:-v0.8.0}"
 KWOK_RELEASE_URL="https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}"
 
@@ -99,8 +104,21 @@ deploy_mock_dms() {
     helm upgrade --install --namespace "${DPF_OPERATOR_NAMESPACE}" mock-dms "${chart}" \
         --set controllerManager.manager.image.repository="${SIM_MOCK_DMS_IMAGE%:*}" \
         --set controllerManager.manager.image.tag="${SIM_MOCK_DMS_IMAGE##*:}" \
-        --set "certIPAddresses={${cp_ip}}"
-    oc -n "${DPF_OPERATOR_NAMESPACE}" rollout status deployment -l app.kubernetes.io/instance=mock-dms --timeout=300s
+        --set "certIPAddresses={${cp_ip}}" \
+        --set "extraArgs={--skip-dpu-cluster-node-selector=dpf.openshift.io/sim-level=m1}"
+    # hostNetwork on a single control-plane node: two replicas cannot coexist.
+    oc -n "${DPF_OPERATOR_NAMESPACE}" patch deployment mock-dms-controller-manager --type=merge \
+        -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
+    oc -n "${DPF_OPERATOR_NAMESPACE}" rollout status deployment/mock-dms-controller-manager --timeout=300s
+
+    # Hosts name the mock-dms pod, which changes on every rollout.
+    oc annotate nodes -l dpf.openshift.io/sim-host=true --overwrite \
+        "provisioning.dpu.nvidia.com/override-dms-pod-name=$(get_mock_dms_pod)"
+}
+
+get_mock_dms_pod() {
+    oc get pods -n "${DPF_OPERATOR_NAMESPACE}" -l app.kubernetes.io/instance=mock-dms \
+        --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}'
 }
 
 # -----------------------------------------------------------------------------
@@ -126,8 +144,7 @@ deploy_sim_dpu() {
 # -----------------------------------------------------------------------------
 create_sim_hosts() {
     local mock_dms_pod cp_ip
-    mock_dms_pod=$(oc get pods -n "${DPF_OPERATOR_NAMESPACE}" \
-        -l app.kubernetes.io/instance=mock-dms -o jsonpath='{.items[0].metadata.name}')
+    mock_dms_pod=$(get_mock_dms_pod)
     cp_ip=$(get_control_plane_ip)
     # No MCD runs on a fake Node, so claim it is already on the pool's rendered
     # config; the maintenance operator needs the node's pool to pause it.
@@ -162,51 +179,6 @@ EOF
     done
 }
 
-# -----------------------------------------------------------------------------
-# Fake DPU node state in the hosted cluster
-# -----------------------------------------------------------------------------
-# What a real DPU provides and kwok cannot. Idempotent; run once the DPUs have
-# joined the hosted cluster (phase "DPU Cluster Config" or later):
-# - nvidia.com/bf_sf, normally advertised by the SF device plugin (HBN needs it)
-# - an InternalIP outside the hosted cluster network (kwok uses its pod IP, which
-#   the hosted API server rejects as an EndpointSlice address)
-# - Ready ServiceInterfaces/ServiceChains, normally set by sfc-controller after
-#   programming OVS; the host stays in maintenance until the chain is Ready
-fake_dpu_node_state() {
-    local hosted_kubeconfig secret host_ip now
-    secret=$(get_dpucluster_kubeconfig_secret)
-    hosted_kubeconfig=$(mktemp)
-    oc get secret -n "${DPF_OPERATOR_NAMESPACE}" "${secret}" \
-        -o jsonpath='{.data.super-admin\.conf}' | base64 -d > "${hosted_kubeconfig}"
-    host_ip=$(get_control_plane_ip)
-    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-
-    local node
-    for node in $(oc --kubeconfig "${hosted_kubeconfig}" get nodes -l node-role.dpf.nvidia.com/fake=true -o name); do
-        log "INFO" "Faking device resources and address on ${node}"
-        oc --kubeconfig "${hosted_kubeconfig}" patch "${node}" --subresource=status --type=merge -p "{\"status\":{
-            \"capacity\":{\"nvidia.com/bf_sf\":\"${SIM_DPU_NUM_SFS}\"},
-            \"allocatable\":{\"nvidia.com/bf_sf\":\"${SIM_DPU_NUM_SFS}\"},
-            \"addresses\":[{\"type\":\"InternalIP\",\"address\":\"${host_ip}\"}]}}"
-    done
-
-    local kind resource condition obj gen
-    for kind in serviceinterface:ServiceInterfaceReconciled servicechain:ServiceChainReconciled; do
-        resource=${kind%%:*}
-        condition=${kind##*:}
-        for obj in $(oc --kubeconfig "${hosted_kubeconfig}" get "${resource}" -n "${DPF_OPERATOR_NAMESPACE}" -o name); do
-            gen=$(oc --kubeconfig "${hosted_kubeconfig}" get "${obj}" -n "${DPF_OPERATOR_NAMESPACE}" -o jsonpath='{.metadata.generation}')
-            log "INFO" "Marking ${obj} Ready"
-            oc --kubeconfig "${hosted_kubeconfig}" patch "${obj}" -n "${DPF_OPERATOR_NAMESPACE}" --subresource=status --type=merge -p "{\"status\":{
-                \"observedGeneration\":${gen},
-                \"conditions\":[
-                  {\"type\":\"Ready\",\"status\":\"True\",\"reason\":\"Success\",\"message\":\"\",\"lastTransitionTime\":\"${now}\",\"observedGeneration\":${gen}},
-                  {\"type\":\"${condition}\",\"status\":\"True\",\"reason\":\"Success\",\"message\":\"\",\"lastTransitionTime\":\"${now}\",\"observedGeneration\":${gen}}]}}"
-        done
-    done
-    rm -f "${hosted_kubeconfig}"
-}
-
 delete_sim_hosts() {
     oc delete nodes -l dpf.openshift.io/sim-host=true --ignore-not-found
 }
@@ -215,6 +187,7 @@ deploy_sim() {
     deploy_kwok_management
     deploy_mock_dms
     deploy_kwok_hosted
+    deploy_sim_dpu
     create_sim_hosts
 }
 
@@ -227,12 +200,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
         deploy-kwok-hosted)     deploy_kwok_hosted ;;
         deploy-mock-dms)        deploy_mock_dms ;;
         create-sim-hosts)       create_sim_hosts ;;
-        fake-dpu-node-state)    fake_dpu_node_state ;;
         deploy-sim-dpu)         deploy_sim_dpu ;;
         delete-sim-hosts)       delete_sim_hosts ;;
         deploy-sim)             deploy_sim ;;
         *)
-            echo "Usage: $0 {deploy-sim|deploy-kwok-management|deploy-kwok-hosted|deploy-mock-dms|create-sim-hosts|fake-dpu-node-state|deploy-sim-dpu|delete-sim-hosts}"
+            echo "Usage: $0 {deploy-sim|deploy-kwok-management|deploy-kwok-hosted|deploy-mock-dms|create-sim-hosts|deploy-sim-dpu|delete-sim-hosts}"
             exit 1
             ;;
     esac

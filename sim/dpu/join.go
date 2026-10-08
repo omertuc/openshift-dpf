@@ -19,6 +19,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/util/retry"
 )
 
 // kubeletJoin replays what the kubelet of an RHCOS DPU does on first boot:
@@ -120,29 +121,11 @@ func (j *kubeletJoin) stepRegisterNode(ctx context.Context, opts *options) (stri
 			Annotations: map[string]string{"kwok.x-k8s.io/node": "fake"},
 		},
 	}
-	node, err = cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
-	if apierrors.IsAlreadyExists(err) {
-		node, err = cs.CoreV1().Nodes().Get(ctx, j.hostname, metav1.GetOptions{})
-	}
-	if err != nil {
+	_, err = cs.CoreV1().Nodes().Create(ctx, node, metav1.CreateOptions{})
+	if err != nil && !apierrors.IsAlreadyExists(err) {
 		return "", fmt.Errorf("register Node as %s: %w", j.nodeName(), err)
 	}
-	resources := corev1.ResourceList{
-		corev1.ResourceCPU:    resource.MustParse("16"),
-		corev1.ResourceMemory: resource.MustParse("32Gi"),
-		corev1.ResourcePods:   resource.MustParse("250"),
-		// Normally advertised by the SF device plugin; HBN requests it.
-		"nvidia.com/bf_sf": *resource.NewQuantity(int64(opts.numSFs), resource.DecimalSI),
-	}
-	node.Status.Capacity = resources
-	node.Status.Allocatable = resources
-	node.Status.NodeInfo.Architecture = "arm64"
-	node.Status.NodeInfo.OperatingSystem = "linux"
-	node.Status.Addresses = []corev1.NodeAddress{
-		{Type: corev1.NodeInternalIP, Address: opts.nodeIP},
-		{Type: corev1.NodeHostName, Address: j.hostname},
-	}
-	if _, err := cs.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{}); err != nil {
+	if err := setSimulatedNodeStatus(ctx, cs, node.Name, opts); err != nil {
 		return "", fmt.Errorf("update Node status as %s: %w", j.nodeName(), err)
 	}
 	j.nodeRegistered = true
@@ -222,4 +205,58 @@ func issuedCert(ctx context.Context, cs kubernetes.Interface, name string) ([]by
 		return nil, nil
 	}
 	return csr.Status.Certificate, nil
+}
+
+// setSimulatedNodeStatus reports what a real DPU Node reports and kwok does
+// not: device resources and an address outside the hosted cluster network.
+// kwok updates the same status, so retry on conflict.
+func setSimulatedNodeStatus(ctx context.Context, cs kubernetes.Interface, name string, opts *options) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		node, err := cs.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if node.Status.Capacity == nil {
+			node.Status.Capacity = corev1.ResourceList{}
+		}
+		if node.Status.Allocatable == nil {
+			node.Status.Allocatable = corev1.ResourceList{}
+		}
+		for k, v := range simulatedResources(opts) {
+			node.Status.Capacity[k] = v
+			node.Status.Allocatable[k] = v
+		}
+		node.Status.NodeInfo.Architecture = "arm64"
+		node.Status.NodeInfo.OperatingSystem = "linux"
+		node.Status.Addresses = []corev1.NodeAddress{
+			{Type: corev1.NodeInternalIP, Address: opts.nodeIP},
+			{Type: corev1.NodeHostName, Address: name},
+		}
+		_, err = cs.CoreV1().Nodes().UpdateStatus(ctx, node, metav1.UpdateOptions{})
+		return err
+	})
+}
+
+func simulatedResources(opts *options) corev1.ResourceList {
+	return corev1.ResourceList{
+		corev1.ResourceCPU:    resource.MustParse("16"),
+		corev1.ResourceMemory: resource.MustParse("32Gi"),
+		corev1.ResourcePods:   resource.MustParse("250"),
+		// Normally advertised by the SF device plugin; HBN requests it.
+		"nvidia.com/bf_sf": *resource.NewQuantity(int64(opts.numSFs), resource.DecimalSI),
+	}
+}
+
+// simulatedNodeStatusSet reports whether setSimulatedNodeStatus already ran.
+func simulatedNodeStatusSet(node *corev1.Node, opts *options) bool {
+	q, ok := node.Status.Allocatable["nvidia.com/bf_sf"]
+	if !ok || q.Value() != int64(opts.numSFs) {
+		return false
+	}
+	for _, a := range node.Status.Addresses {
+		if a.Type == corev1.NodeInternalIP {
+			return a.Address == opts.nodeIP
+		}
+	}
+	return false
 }

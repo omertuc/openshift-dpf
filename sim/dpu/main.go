@@ -20,6 +20,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -80,6 +81,7 @@ func main() {
 		fatal("management cluster client", err)
 	}
 	var hosted dynamic.Interface
+	var hostedCS kubernetes.Interface
 	if opts.hostedKubeconfig != "" {
 		cfg, err := clientcmd.BuildConfigFromFlags("", opts.hostedKubeconfig)
 		if err != nil {
@@ -88,9 +90,12 @@ func main() {
 		if hosted, err = dynamic.NewForConfig(cfg); err != nil {
 			fatal("hosted cluster client", err)
 		}
+		if hostedCS, err = kubernetes.NewForConfig(cfg); err != nil {
+			fatal("hosted cluster client", err)
+		}
 	}
 
-	s := &simulator{opts: opts, mgmt: mgmt, hosted: hosted, joins: map[string]*kubeletJoin{}}
+	s := &simulator{opts: opts, mgmt: mgmt, hosted: hosted, hostedCS: hostedCS, joins: map[string]*kubeletJoin{}}
 	ticker := time.NewTicker(opts.interval)
 	defer ticker.Stop()
 	for {
@@ -107,6 +112,8 @@ type simulator struct {
 	opts   *options
 	mgmt   dynamic.Interface
 	hosted dynamic.Interface
+	// hostedCS is the hosted cluster admin client for the stand-ins.
+	hostedCS kubernetes.Interface
 	// joins is keyed by DPU UID, so a reprovisioned DPU joins again.
 	joins map[string]*kubeletJoin
 }
@@ -134,6 +141,7 @@ func (s *simulator) reconcile(ctx context.Context) {
 		}
 	}
 	if s.hosted != nil {
+		s.reconcileNodeStatus(ctx)
 		s.reconcileSFC(ctx)
 	}
 }

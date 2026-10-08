@@ -50,6 +50,16 @@ spec:
         app: sim-dpu
     spec:
       serviceAccountName: sim-dpu
+      # Never on a simulated (kwok) host, where it would not actually run.
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
       containers:
       - name: sim-dpu
         image: <SIM_DPU_IMAGE>

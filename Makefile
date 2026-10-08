@@ -576,7 +576,7 @@ help:
 	@echo ""
 	@echo "Verification:"
 	@echo "  verify-deployment     - Full verification: workers + DPU nodes + DPUDeployment"
-	@echo "  deploy-sim            - Simulated DPUs: mock-dms + kwok + fake host Nodes (SIM_MOCK_DMS_IMAGE required)"
+	@echo "  deploy-sim            - Simulated DPUs: mock-dms + kwok + sim-dpu + fake host Nodes (SIM_MOCK_DMS_IMAGE, SIM_DPU_IMAGE required; SIM_LEVEL=m0|m1)"
 	@echo "  delete-sim-hosts      - Delete the fake host Nodes"
 	@echo "  verify-workers        - Wait for worker nodes to be Ready in host cluster"
 	@echo "  verify-dpu-nodes      - Wait for DPU nodes to be Ready in DPUCluster"

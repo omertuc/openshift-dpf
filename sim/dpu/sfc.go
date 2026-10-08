@@ -90,3 +90,24 @@ func (s *simulator) markReady(ctx context.Context, gvr schema.GroupVersionResour
 	_, err := s.hosted.Resource(gvr).Namespace(obj.GetNamespace()).UpdateStatus(ctx, obj, metav1.UpdateOptions{})
 	return err
 }
+
+// reconcileNodeStatus applies the simulated device resources and address to
+// every simulated DPU Node, including those mock-dms created (M0).
+func (s *simulator) reconcileNodeStatus(ctx context.Context) {
+	nodes, err := s.hostedCS.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: fakeNodeLabel + "=true"})
+	if err != nil {
+		slog.Error("list simulated DPU Nodes", "err", err)
+		return
+	}
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		if simulatedNodeStatusSet(node, s.opts) {
+			continue
+		}
+		if err := setSimulatedNodeStatus(ctx, s.hostedCS, node.Name, s.opts); err != nil {
+			slog.Error("set simulated Node status", "node", node.Name, "err", err)
+			continue
+		}
+		slog.Info("set simulated Node status (device plugin stand-in)", "node", node.Name)
+	}
+}
