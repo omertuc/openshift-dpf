@@ -30,7 +30,7 @@ levels from interfering with each other.
 | Management cluster | `export KUBECONFIG=~/.kube/dpf-dev/profile-1/mgmt.kubeconfig` (cluster `omer-upgrade`) |
 | Hosted (DPU) cluster kubeconfig | `s=$(oc get dpucluster -n dpf-operator-system -o jsonpath='{.items[0].spec.kubeconfig}'); oc get secret -n dpf-operator-system $s -o jsonpath='{.data.super-admin\.conf}' \| base64 -d > /tmp/hosted.kubeconfig` |
 | **hv2** (x86 hypervisor, 10.6.135.44) | host VMs `vm-omertuc-wew-worker1/2`. The openshift-dpf checkout that created them is at `/root/user-envs/omertuc/openshift-dpf-m2b`. The patched QEMU is `/usr/libexec/qemu-kvm-bf3sim`, with its build files in `/root/user-envs/omertuc/qemu-bf3sim/` |
-| **aarchv** (Ampere aarch64 hypervisor, 10.6.135.47) | DPU VMs `dpusim-*` and the leaf. **Other people use this machine, so keep RAM and disk use low.** The leaf script is at `/root/omer-dpu-sim/leaf.sh`. `rhel10.2-omer` (shut off) is the old "aarc" machine from before VMs; leave it alone without asking |
+| **aarchv** (Ampere aarch64 hypervisor, 10.6.135.47) | DPU VMs `dpusim-*` and the leaf. **Other people use this machine, so keep RAM and disk use low.** The running leaf was started with the old `/root/omer-dpu-sim/leaf.sh`; `dpusim leaf` replaces it. `rhel10.2-omer` (shut off) is the old "aarc" machine from before VMs; leave it alone without asking |
 
 Wires between the hypervisors. Each host↔DPU pair gets its own VXLAN:
 
@@ -39,16 +39,16 @@ Wires between the hypervisors. Each host↔DPU pair gets its own VXLAN:
 | worker1 `52-54-00-aa-fb-35` ↔ VM `dpusim-m4-dpu` | `dpusim0` | `vxdpusim` (4247) | `br-dpusim` | `br-dpufab0` (leaf `swp0`) |
 | worker2 `52-54-00-d6-62-89` ↔ VM `dpusim-52-54-00-d6-62-89-mt26sim62371` | `dpusim1` | `vxdpusim1` (4248) | `br-dpusim1` | `br-dpufab1` (leaf `swp1`) |
 
-Create a wire with `sim/fabric/wire.sh` on both hypervisors:
+Create a wire with `dpusim wire` on both hypervisors:
 
 ```bash
-sim/fabric/wire.sh up br-dpusim1 4248 10.6.135.47 10.6.135.44   # on aarchv
-sim/fabric/wire.sh up dpusim1 4248 10.6.135.44 10.6.135.47      # on hv2
+dpusim wire up br-dpusim1 4248 10.6.135.47 10.6.135.44   # on aarchv
+dpusim wire up dpusim1 4248 10.6.135.44 10.6.135.47      # on hv2
 ```
 
 The bridges must behave as a wire, not a switch (`ageing_time 0`, so they learn no
 MACs), and the host's two NICs must be isolated from each other
-(`<port isolated='yes'/>`, added by `m2b-switch-vm.py`). Otherwise traffic between two
+(`<port isolated='yes'/>`, added by `dpusim m2b-switch-vm`). Otherwise traffic between two
 pods on the same host is dropped: the DPU sends it back down the same link, and a
 learning bridge then believes the destination is on the DPU side.
 
@@ -60,9 +60,34 @@ learning bridge then believes the destination is on the DPU side.
   - VLAN 100+N = host p0 VF N (`rep0-N`);
   - VLAN 200+N = host p1 VF N (`rep1-N`).
 
-  The host tags its VFs (`bf3sim-host.sh`), and the DPU splits the trunk with a
-  VLAN-filtering bridge called `dpuwire` (`m3/dpf-ovs-sim.sh`).
+  The host tags its VFs (`dpusim bf3-host`), and the DPU splits the trunk with a
+  VLAN-filtering bridge called `dpuwire` (`dpusim dpu-ovs`).
 - **fabric**, named `p0`: the uplink to the leaf.
+
+## The `dpusim` tool
+
+Everything except the Go code (`dpu/`) and the dashboard is one
+Rust binary, `dpusim/`. It is static, so the same build runs on the workstation, the
+hypervisors, the host VMs and the DPU VMs:
+
+| Where | Subcommands |
+|---|---|
+| workstation (`KUBECONFIG` = management cluster) | `dpu-vm create\|delete`, `ignition`, `bfcfg-to-ignition`, `image mock-dms\|ovs-cni\|ovn-dpf-utils\|ovnk` |
+| hypervisors | `wire up\|down`, `leaf up\|down` (aarchv), `m2b-switch-vm` (hv2) |
+| host VM (M2b) | `bf3-host`, run by `qemu/bf3sim-host.service` |
+| DPU VM | `dpu-ovs`, run by `dpf-ovs-sim.service`; the DPU ignition installs the binary |
+
+```bash
+cd sim/dpusim
+cargo build --release --target x86_64-unknown-linux-musl    # workstation, hv2, host VMs
+cargo build --release --target aarch64-unknown-linux-musl   # aarchv; embedded in every DPU ignition
+# one-time: rustup target add x86_64-unknown-linux-musl aarch64-unknown-linux-musl
+scp target/aarch64-unknown-linux-musl/release/dpusim aarchv:/usr/local/bin/
+```
+
+The aarch64 build must exist before `dpu-vm create` or `ignition`, because they embed
+it in the DPU's ignition. Override its path with `--dpu-binary`.
+`dpusim <command> --help` lists every option and the environment variables that set it.
 
 ## Runbooks
 
@@ -99,11 +124,11 @@ make delete-sim-hosts                             # removes all fake hosts
    cd /root/user-envs/omertuc/qemu-bf3sim
    V=vm-omertuc-wew-worker2
    virsh dumpxml --inactive $V > $V.backup.xml
-   python3 m2b-switch-vm.py $V.backup.xml /usr/libexec/qemu-kvm-bf3sim <SERIAL> <p0-mac> <p1-mac> > $V.bf3sim.xml
+   dpusim m2b-switch-vm $V.backup.xml /usr/libexec/qemu-kvm-bf3sim <SERIAL> <p0-mac> <p1-mac> > $V.bf3sim.xml
    virsh define $V.bf3sim.xml && virsh destroy $V && virsh start $V
    ```
-3. Copy `qemu/bf3sim-host.sh` to `/usr/local/bin/` and `qemu/bf3sim-host.service` to
-   `/etc/systemd/system/` on the host, then enable the service. It makes p0/p1 report
+3. Copy the x86_64 `dpusim` to `/usr/local/bin/` and `qemu/bf3sim-host.service` to
+   `/etc/systemd/system/` on the host, then enable the service (`dpusim bf3-host`). It makes p0/p1 report
    BlueField device id `0xa2dc`, creates 7 VFs per PF and tags them with VLANs. It also
    gives p0 the MAC that OVN-K expects for DHCP from the DPU.
 4. Label the node `dpf.openshift.io/sim-level=m4 feature.node.kubernetes.io/dpu-enabled=`.
@@ -140,14 +165,14 @@ the OS install. Then:
 
 ```bash
 export KUBECONFIG=~/.kube/dpf-dev/profile-1/mgmt.kubeconfig
-sim/m3/create-dpu-vm.sh <dpu-name>                                      # M3: no wire
-sim/m3/create-dpu-vm.sh --wire-bridge br-dpusim1 --fabric-bridge br-dpufab1 <dpu-name>   # M4 + M6
-sim/m3/create-dpu-vm.sh --delete <dpu-name>
+dpusim dpu-vm create <dpu-name>                                      # M3: no wire
+dpusim dpu-vm create --wire-bridge br-dpusim1 --fabric-bridge br-dpufab1 <dpu-name>   # M4 + M6
+dpusim dpu-vm delete <dpu-name>
 ```
 
-`create-dpu-vm.sh` takes the DPU's bf.cfg from bfb-registry, then:
-- turns it into a boot ignition (`m3/build-ignition.sh` and `m3/dpu-ignition.py`), which
-  masks BlueField-only units and installs `dpf-ovs-sim.sh` and fwctl;
+`dpu-vm create` takes the DPU's bf.cfg from bfb-registry, then:
+- turns it into a boot ignition (`dpusim ignition`; `bfcfg-to-ignition` for a bf.cfg
+  file), which masks BlueField-only units and installs `dpusim` (for `dpu-ovs`) and fwctl;
 - creates a thin overlay on a shared RHCOS 4.22 aarch64 image;
 - boots the VM with BlueField-3 SMBIOS (HBN checks for it).
 
@@ -165,13 +190,12 @@ The DPU's OVN-K runs with `--simulate-dpu`, from 4.23+, via the image overrides 
 - **ovs-cni.** DPF's ovs-cni is patched (`ovs-cni/sim-sf.patch`, on doca-platform
   `v26.4.1`). It turns a `sim-sf-*` device into a veth pair: the pod end is the SF
   (`p0_if`, `p1_if`, `pf2dpu2_if`), and the host end is a plain OVS port. Build it with
-  `ovs-cni/build.sh <doca-platform@v26.4.1 with the patch applied> <image>`, then point
+  `dpusim image ovs-cni <doca-platform@v26.4.1 with the patch applied> <image>`, then point
   DPF at it (see [Manual changes](#manual-changes-on-the-live-cluster)).
 
 ### M6: leaf switch and a second pair
 
-- **Start the leaf.** On aarchv, run `bash /root/omer-dpu-sim/leaf.sh up 2`; the source
-  is `fabric/leaf.sh`. It starts an FRR container `dpusim-leaf` (AS 65000) with ports
+- **Start the leaf.** On aarchv, run `dpusim leaf up 2`. It starts an FRR container `dpusim-leaf` (AS 65000) with ports
   `swpN` on `br-dpufabN`.
 - **HBN peers with the leaf.** Each DPU's HBN uses BGP unnumbered on `p0_if`, with its
   own AS (65101 + last octet of its loopback).
@@ -181,7 +205,7 @@ The DPU's OVN-K runs with `--simulate-dpu`, from 4.23+, via the image overrides 
   oc --kubeconfig /tmp/hosted.kubeconfig -n dpf-operator-system exec <hbn-pod> -c doca-hbn -- vtysh -c 'show bgp summary'
   ```
 - **Second pair:** a second host VM (M2b runbook), a second wire with VNI 4248, and
-  `create-dpu-vm.sh --wire-bridge br-dpusim1 --fabric-bridge br-dpufab1`.
+  `dpusim dpu-vm create --wire-bridge br-dpusim1 --fabric-bridge br-dpufab1`.
 
 ### Dashboard
 
@@ -241,11 +265,11 @@ Leftovers:
 
 | Image | What | Built by |
 |---|---|---|
-| `mock-dms:m2a` (also `:m1`) | NVIDIA mock-dms + `mock-dms/*.patch` | `mock-dms/build.sh` |
+| `mock-dms:m2a` (also `:m1`) | NVIDIA mock-dms + `mock-dms/*.patch` | `dpusim image mock-dms` |
 | `sim-dpu:m2a`, `:m2a-2`, `:m5` (`:m1c` older) | our Go tool `dpu/`: DPU joiner, sfc / node-status stand-ins, dpu-agent (`--agent-host`), SF device plugin (`--sf-device-plugin`). `m5` is multi-arch | `podman build -f sim/dpu/Containerfile sim/dpu` |
-| `sim-dpu:ovnk-simdpu-arm64` | DPF's 4.22 arm64 OVN-K image with go-controller binaries from openshift/ovn-kubernetes `release-4.23` @ `42d40a055` (no patches) | `ovnk/build.sh` |
-| `sim-dpu:ovn-dpf-utils-simdpu-arm64` | ovn-kubernetes-dpf `v26.4.1-ocp-release-v4.22` + `ovn-dpf-utils/sim-dpu.patch` (cniprovisioner simulated-DPU mode) | `ovn-dpf-utils/build.sh` |
-| `sim-dpu:ovs-cni-simsf-veth2-arm64` (current; `-veth-` and `ovs-cni-simsf-arm64` are older, broken) | DPF ovs-cni `v26.4.1` + `ovs-cni/sim-sf.patch` | `ovs-cni/build.sh` |
+| `sim-dpu:ovnk-simdpu-arm64` | DPF's 4.22 arm64 OVN-K image with go-controller binaries from openshift/ovn-kubernetes `release-4.23` @ `42d40a055` (no patches) | `dpusim image ovnk` |
+| `sim-dpu:ovn-dpf-utils-simdpu-arm64` | ovn-kubernetes-dpf `v26.4.1-ocp-release-v4.22` + `ovn-dpf-utils/sim-dpu.patch` (cniprovisioner simulated-DPU mode) | `dpusim image ovn-dpf-utils` |
+| `sim-dpu:ovs-cni-simsf-veth2-arm64` (current; `-veth-` and `ovs-cni-simsf-arm64` are older, broken) | DPF ovs-cni `v26.4.1` + `ovs-cni/sim-sf.patch` | `dpusim image ovs-cni` |
 | `nvcr.io/nvidia/doca/hostdriver:v26.4.1` | NVIDIA's real hostagent (M2a+) | n/a |
 
 The DPU VMs boot stock RHCOS 4.22 aarch64. MCO then rebases them to

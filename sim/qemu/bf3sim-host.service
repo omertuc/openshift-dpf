@@ -6,7 +6,7 @@ Before=kubelet-dependencies.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/usr/local/bin/bf3sim-host.sh
+ExecStart=/usr/local/bin/dpusim bf3-host
 
 [Install]
 WantedBy=multi-user.target

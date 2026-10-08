@@ -367,8 +367,8 @@ const LEVELS = [
     sub: {hostnode: "kwok Node", hostagent: "M2a pod", nic: "fake sysfs", dpuos: "Arm VM (Ampere KVM)", dpuagent: "masked; sidecar",
           ovs: "OVS-DOCA, sim bridges", ovndpu: "runs; no host", sfs: "sim bf_sf", hbn: "runs", tmfifo: "localhost"},
     how: [
-      "<code>dpu-ignition.py</code> turns the DPU's bf.cfg into the target ignition, <b>masking 11 BlueField hardware units</b> (devlink, SFs, rshim/tmfifo, firmware), adding the hostname, mapping the machine's NIC to <code>pf0vf0</code> in <code>br-comm-ch</code> and fixing its MTU.",
-      "<code>create-dpu-vm.sh</code> creates an <b>aarch64 VM</b> on the Ampere hypervisor: a thin overlay of the stock RHCOS aarch64 disk image, the ignition passed via <code>fw_cfg</code>, BlueField-3 SMBIOS identity and a management NIC (≈4 min from creation to a Ready DPU node). Without a hypervisor, the same image boots under QEMU TCG on a laptop, just slowly. MCO rebases onto <code>bluefield-ocp</code>, the real kubelet joins via the provisioner's CSR approval.",
+      "<code>dpusim ignition</code> turns the DPU's bf.cfg into the target ignition, <b>masking 11 BlueField hardware units</b> (devlink, SFs, rshim/tmfifo, firmware), adding the hostname, mapping the machine's NIC to <code>pf0vf0</code> in <code>br-comm-ch</code> and fixing its MTU.",
+      "<code>dpusim dpu-vm create</code> creates an <b>aarch64 VM</b> on the Ampere hypervisor: a thin overlay of the stock RHCOS aarch64 disk image, the ignition passed via <code>fw_cfg</code>, BlueField-3 SMBIOS identity and a management NIC (≈4 min from creation to a Ready DPU node). Without a hypervisor, the same image boots under QEMU TCG on a laptop, just slowly. MCO rebases onto <code>bluefield-ocp</code>, the real kubelet joins via the provisioner's CSR approval.",
       "DPF's DPU services run for real on OVS-DOCA. SMBIOS <code>board_name=BlueField-3</code> lets HBN's NVUE accept the platform.",
     ],
     rows: [
@@ -436,7 +436,7 @@ const LEVELS = [
     extra: () => fabricDiagram(),
     how: [
       "A second host VM (on the x86 hypervisor) gets its own DPU VM (on the Arm hypervisor), wired exactly like M4 over its own VXLAN (<code>VNI 4248</code>; the first pair uses <code>4247</code>).",
-      "The <b>leaf switch</b> is one small FRR container, <code>dpusim-leaf</code>, on the Arm hypervisor (AS 65000). Each DPU VM has an extra NIC that becomes its uplink <code>p0</code>; it sits on a bridge (<code>br-dpufabN</code>) with leaf port <code>swpN</code>, so each DPU has its own cable to the switch (<code>leaf.sh up 2</code>, <code>create-dpu-vm.sh --fabric-bridge br-dpufabN</code>).",
+      "The <b>leaf switch</b> is one small FRR container, <code>dpusim-leaf</code>, on the Arm hypervisor (AS 65000). Each DPU VM has an extra NIC that becomes its uplink <code>p0</code>; it sits on a bridge (<code>br-dpufabN</code>) with leaf port <code>swpN</code>, so each DPU has its own cable to the switch (<code>dpusim leaf up 2</code>, <code>dpusim dpu-vm create --fabric-bridge br-dpufabN</code>).",
       "HBN on each DPU (AS 65108 and 65110) talks BGP with the leaf over <code>p0_if</code>, without configured IPs (\"BGP unnumbered\"), just like on a real rack. Each DPU announces its loopback and its OVN tunnel subnet (from <code>10.0.120.0/22</code>), and the leaf passes them on.",
       "A pod on host 1 pinging a pod on host 2 goes: VF → DPU 1's OVN → tunnel from <code>10.0.120.1</code> → HBN → <code>p0</code> → leaf → DPU 2's HBN → DPU 2's OVN → host 2's VF → pod. Verified with 0% loss; the leaf's port counters went up by exactly the number of pings.",
     ],
@@ -612,7 +612,7 @@ const COSTS = {
     scale: "a few per hypervisor; 7 VFs per port (igb)",
   },
   M3: {
-    ready: {s: 240, src: "observed", note: "create-dpu-vm.sh on native Arm: VM created → DPU node Ready ≈4 min (boot, MCO rebase, join). Emulated on a laptop (QEMU TCG): ≈30–45 min, mostly the rebase"},
+    ready: {s: 240, src: "observed", note: "dpusim dpu-vm create on native Arm: VM created → DPU node Ready ≈4 min (boot, MCO rebase, join). Emulated on a laptop (QEMU TCG): ≈30–45 min, mostly the rebase"},
     mem: {mib: 2270, src: "measured", note: "Arm DPU VM: 2.2 GiB used of 16 GiB (OS + OVN 246 Mi + DTS 55 Mi + small pods); 8 GiB VMs also work"},
     cpu: {m: 8000, src: "measured", label: "8 vCPU", note: "allocated; load ≈0.15 at rest"},
     infra: "+1 Arm machine (VM) per DPU; laptop TCG works but is too slow for HBN",

@@ -1,5 +1,5 @@
 # DPF's ovs-cni plugin with simulated scalable functions (sim-sf.patch),
-# layered on the deployed v26.4.1 arm64 image. Build with build.sh.
+# layered on the deployed v26.4.1 arm64 image. Build with `dpusim image ovs-cni`.
 FROM nvcr.io/nvidia/doca/ovs-cni-plugin@sha256:d92b4b8f97f9420ced9e140eb56c79bd0c81e8fe22bb615f1726eec8c6b38637
 COPY ovs /ovs
 LABEL org.opencontainers.image.description="DPF ovs-cni v26.4.1 + simulated SFs (openshift-dpf sim/ovs-cni)"
