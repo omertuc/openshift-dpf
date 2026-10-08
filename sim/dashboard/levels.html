@@ -43,6 +43,22 @@
   .bar nav { display: flex; gap: 6px; flex-wrap: wrap; }
   .bar nav a { text-decoration: none; padding: 3px 9px; border-radius: 999px; background: var(--chip); color: var(--text); font-size: 13px; }
   .bar nav a:hover { background: var(--line); }
+  .bar nav a[aria-selected="true"] { background: var(--accent); color: var(--panel); }
+  .tab-panel[hidden] { display: none; }
+  .figbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 2px 2px 8px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--panel); }
+  .seg button { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600;
+                padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--panel); }
+  .seg button:disabled { opacity: .4; cursor: default; }
+  .figbar .cap { margin: 0; }
+  .figbar .hint { margin-left: auto; font-size: 12px; color: var(--muted); }
+  .figbar kbd { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; background: var(--panel); }
+  .stage { display: grid; max-width: 1000px; margin: 0 auto; }
+  .stage .view { grid-area: 1 / 1; opacity: 0; visibility: hidden; transition: opacity .22s ease, visibility 0s linear .22s; }
+  .stage[data-view="real"] .view[data-v="real"], .stage[data-view="this"] .view[data-v="this"],
+  .stage[data-view="prev"] .view[data-v="prev"] { opacity: 1; visibility: visible; transition: opacity .22s ease; }
+  @media (prefers-reduced-motion: reduce) { .stage .view { transition: none; } }
   .bar .spacer { flex: 1; }
   main { max-width: 1480px; margin: 0 auto; padding: 8px 16px 48px; }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin: 18px 0; scroll-margin-top: 64px; }
@@ -99,8 +115,30 @@
   .steps li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%;
                       background: var(--accent); color: var(--panel); font-size: 13px; font-weight: 700; display: grid; place-items: center; }
   .themebtn { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 3px 9px; cursor: pointer; font-size: 13px; }
+  .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 14px; margin: 10px 0 4px; }
+  .chart { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 6px; background: var(--bg); min-width: 0; }
+  .chart h4 { margin: 0 0 2px; font-size: 14px; }
+  #scale-charts { grid-template-columns: minmax(0, 720px); }
+  .chart .sub { font-size: 12px; color: var(--muted); margin: 0 0 6px; }
+  svg.bars { display: block; width: 100%; height: auto; color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .src { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; white-space: nowrap; letter-spacing: .02em; }
+  .src.measured { color: var(--real); background: var(--real-bg); }
+  .src.observed { color: var(--partial); background: var(--partial-bg); }
+  .src.estimate { color: var(--fake); background: var(--fake-bg); }
+  .costline { display: flex; gap: 8px 16px; flex-wrap: wrap; align-items: center; font-size: 13px; color: var(--muted);
+              border: 1px dashed var(--line); border-radius: 10px; padding: 7px 12px; margin: 4px 0 12px; }
+  .costline b { color: var(--text); font-weight: 600; }
+  .costline a { margin-left: auto; font-size: 12px; }
+  table.cmp.costs td { white-space: normal; }
+  table.cmp.costs td:first-child { white-space: nowrap; }
+  table.cmp.costs .n { font-variant-numeric: tabular-nums; }
   @media (max-width: 860px) {
-    header { position: static; }
+    .bar { gap: 8px; }
+    .bar h1 { font-size: 15px; }
+    .bar nav { order: 9; flex: 1 0 100%; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+    .bar nav::-webkit-scrollbar { display: none; }
+    .bar nav a { flex: none; }
+    .figbar .hint { display: none; }
     section { scroll-margin-top: 8px; }
     .pair, .cols { grid-template-columns: 1fr; }
     section { padding: 16px; }
@@ -113,14 +151,14 @@
 <header>
   <div class="bar">
     <h1>DPU Simulation · How it works</h1>
-    <nav id="toc"></nav>
+    <nav id="toc" role="tablist" aria-label="Sections"></nav>
     <span class="spacer"></span>
     <a href="/">← Live status</a>
     <button class="themebtn" id="theme" title="Toggle theme">◐</button>
   </div>
 </header>
 <main>
-  <section id="overview">
+  <section id="overview" class="tab-panel" data-tab="overview">
     <h2>A real DPF-on-OpenShift system</h2>
     <p class="lede">Every level keeps this same picture. What changes is which boxes are real and which are stand-ins.</p>
     <div class="fig scroll hero"><div class="cap">Real system: x86 host with a BlueField-3</div><div id="dia-real"></div></div>
@@ -146,11 +184,31 @@
     </div>
   </section>
 
-  <section id="ladder">
+  <section id="ladder" class="tab-panel" data-tab="overview">
     <h2>The level ladder</h2>
     <p class="lede">Which pieces are real at each level. Levels stack: each one keeps what's below it real and replaces another fake.</p>
     <div class="scroll"><table class="ladder" id="ladder-table"></table></div>
     <div class="legend" id="legend2"></div>
+  </section>
+
+  <section id="costs" class="tab-panel" data-tab="costs">
+    <h2>Costs</h2>
+    <p class="lede">What each level costs on top of the management cluster: how long a DPU takes to reach Ready, what it uses while running,
+      and what infrastructure it needs. Numbers come from this lab cluster (SNO management cluster, hosted cluster, Arm DPU VMs on an Ampere hypervisor).</p>
+    <div class="legend">
+      <span><span class="src measured">MEASURED</span> read from the cluster, VMs or registries</span>
+      <span><span class="src observed">OBSERVED</span> timed by hand in this session</span>
+      <span><span class="src estimate">ESTIMATE</span> derived, not measured directly</span>
+    </div>
+    <div class="charts" id="cost-charts"></div>
+    <h3>Per level</h3>
+    <div class="scroll"><table class="cmp costs" id="cost-table"></table></div>
+    <div class="callout" id="cost-scale"></div>
+    <h3>Scaling to 100 DPUs</h3>
+    <p class="lede">Projected from the per-DPU numbers above. Everything here is an <span class="src estimate">ESTIMATE</span> unless it repeats a measured per-DPU figure.</p>
+    <div class="charts" id="scale-charts"></div>
+    <div class="scroll"><table class="cmp costs" id="scale-table"></table></div>
+    <div class="callout" id="swarm-note"></div>
   </section>
 
   <div id="levels"></div>
@@ -306,16 +364,16 @@ const LEVELS = [
     states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "fake", hostagent: "partial", ovnhost: "fake", nic: "fake",
              dpuos: "real", dpuagent: "fake", ovs: "partial", ovndpu: "partial", sfs: "fake", hbn: "partial", fw: "na",
              pcie: "na", tmfifo: "fake", fabric: "na"},
-    sub: {hostnode: "kwok Node", hostagent: "M2a pod", nic: "fake sysfs", dpuos: "aarc (Ampere KVM)", dpuagent: "masked; sidecar",
+    sub: {hostnode: "kwok Node", hostagent: "M2a pod", nic: "fake sysfs", dpuos: "Arm VM (Ampere KVM)", dpuagent: "masked; sidecar",
           ovs: "OVS-DOCA, sim bridges", ovndpu: "runs; no host", sfs: "sim bf_sf", hbn: "runs", tmfifo: "localhost"},
     how: [
       "<code>dpu-ignition.py</code> turns the DPU's bf.cfg into the target ignition, <b>masking 11 BlueField hardware units</b> (devlink, SFs, rshim/tmfifo, firmware), adding the hostname, mapping the machine's NIC to <code>pf0vf0</code> in <code>br-comm-ch</code> and fixing its MTU.",
-      "The machine (<b>aarc</b>, a KVM VM on an Ampere host; also emulated aarch64 VMs on the laptop) <b>kexecs</b> a live RHCOS initramfs that runs <b>coreos-installer</b> with that ignition. MCO rebases onto <code>bluefield-ocp</code>, the real kubelet joins via the provisioner's CSR approval.",
+      "<code>create-dpu-vm.sh</code> creates an <b>aarch64 VM</b> on the Ampere hypervisor: a thin overlay of the stock RHCOS aarch64 disk image, the ignition passed via <code>fw_cfg</code>, BlueField-3 SMBIOS identity and a management NIC (≈4 min from creation to a Ready DPU node). Without a hypervisor, the same image boots under QEMU TCG on a laptop, just slowly. MCO rebases onto <code>bluefield-ocp</code>, the real kubelet joins via the provisioner's CSR approval.",
       "DPF's DPU services run for real on OVS-DOCA. SMBIOS <code>board_name=BlueField-3</code> lets HBN's NVUE accept the platform.",
     ],
     rows: [
       ["DPU OS", "BFB on BlueField Arm cores", "Same image on an Arm VM"],
-      ["Install", "rshim/BFB → live ignition → coreos-installer", "kexec → coreos-installer"],
+      ["Install", "rshim/BFB → live ignition → coreos-installer", "VM from the RHCOS disk image + ignition via fw_cfg"],
       ["Services", "OVN-K, HBN, DTS on the DPU", "Same pods, no BlueField devices"],
     ],
     proves: ["The provisioner's ignition boots a real DPU OS end to end", "Real kubelet join and CSR approval", "DPU services' behavior without hardware (found IPAM, MTU, platform checks)"],
@@ -328,10 +386,10 @@ const LEVELS = [
              dpuos: "real", dpuagent: "fake", ovs: "partial", ovndpu: "partial", sfs: "fake", hbn: "partial", fw: "na",
              pcie: "partial", tmfifo: "fake", fabric: "na"},
     sub: {hostnode: "RHCOS VM", hostagent: "M2a pod", nic: "igb, VLAN per VF", ovnhost: "dpu-host, Ready",
-          dpuos: "aarc", dpuagent: "sidecar", ovs: "kernel DP, veth reps", ovndpu: "--simulate-dpu", sfs: "sim bf_sf",
+          dpuos: "dpusim-m4-dpu", dpuagent: "sidecar", ovs: "kernel DP, veth reps", ovndpu: "--simulate-dpu", sfs: "sim bf_sf",
           hbn: "runs", pcie: "VXLAN · VLAN trunk", tmfifo: "localhost"},
     how: [
-      "A <b>VXLAN</b> joins the host VM's igb bridge (<code>dpusim0</code> on one hypervisor) to a bridge holding aarc's extra NIC (<code>br-dpusim</code> on the Ampere hypervisor).",
+      "A <b>VXLAN</b> joins the host VM's igb bridge (<code>dpusim0</code> on one hypervisor) to a bridge holding the DPU VM's wire NIC (<code>br-dpusim</code> on the Ampere hypervisor).",
       "The host PF tags VF N's traffic with VLAN <code>(pf+1)×100+N</code>. On the DPU a <b>VLAN-filtering bridge</b> splits the trunk into representor veths: <code>rep0-0</code> for the host PF, <code>rep0-N</code> for VF N, on OVS's kernel datapath.",
       "OVN-K on the DPU runs release-4.23 binaries with <code>--simulate-dpu</code> (representors by name; gateway MAC from <code>sha256(hostNode+\"\\0host\")</code>), and DPF's <code>cniprovisioner</code> is patched (<code>DPF_SIM_DPU</code>) for the host PF MAC.",
       "The host's <code>p0</code> gets its address by <b>DHCP from the DPU's dnsmasq across the wire</b>, and the host node goes Ready with OVN-K dpu-host.",
@@ -350,7 +408,7 @@ const LEVELS = [
     states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "real", hostagent: "partial", ovnhost: "real", nic: "partial",
              dpuos: "real", dpuagent: "fake", ovs: "partial", ovndpu: "partial", sfs: "partial", hbn: "real", fw: "na",
              pcie: "partial", tmfifo: "fake", fabric: "fake"},
-    sub: {hostnode: "RHCOS VM", hostagent: "M2a pod", nic: "igb", ovnhost: "dpu-host", dpuos: "aarc", dpuagent: "sidecar",
+    sub: {hostnode: "RHCOS VM", hostagent: "M2a pod", nic: "igb", ovnhost: "dpu-host", dpuos: "dpusim-m4-dpu", dpuagent: "sidecar",
           ovs: "br-hbn ↔ br-sfc", ovndpu: "--simulate-dpu", sfs: "OVS internal ports", hbn: "doca_hbn 3.4.0",
           pcie: "VXLAN · VLAN", fabric: "veths, peers idle", tmfifo: "localhost"},
     how: [
@@ -445,8 +503,162 @@ const ALL_REAL = Object.fromEntries([...COMPONENTS.map(c => c.id), ...LINKS.map(
 document.getElementById("dia-real").innerHTML = diagram(ALL_REAL, {});
 document.getElementById("legend").innerHTML = legend();
 document.getElementById("legend2").innerHTML = legend();
-document.getElementById("toc").innerHTML = `<a href="#overview">Overview</a><a href="#ladder">Ladder</a>` +
-  LEVELS.map(l => `<a href="#${l.key}">${l.key}</a>`).join("");
+const TABS = ["overview", ...LEVELS.map(l => l.key), "costs"];
+const TAB_LABEL = {overview: "Overview", costs: "Costs"};
+document.getElementById("toc").innerHTML = TABS.map(t =>
+  `<a href="#${t}" role="tab" data-tab="${t}" aria-selected="false">${TAB_LABEL[t] || t}</a>`).join("");
+
+// Costs per simulated DPU on top of the management + hosted clusters, from
+// this lab (2026-10-08). src: measured | observed | estimate.
+const COSTS = {
+  M0: {
+    ready: {s: 356, src: "measured", note: "first DPUs; included waiting on a manual MachineConfigPool fix. Phases flip as soon as DPF requeues"},
+    mem: {mib: 0.1, src: "estimate", label: "≈0", note: "a kwok Node and pods are API objects only; shared: mock-dms 19 Mi, kwok 33 Mi + 22 Mi"},
+    cpu: {m: 0, src: "measured", label: "≈0", note: "shared controllers idle at 1–9 m"},
+    infra: "Nothing beyond the clusters: mock-dms, two kwok controllers",
+    pull: "mock-dms 35 MiB, kwok 39 MiB (once)",
+    scale: "hundreds of DPUs per management cluster",
+  },
+  M1: {
+    ready: {s: 71, src: "measured", note: "71–72 s for 2 of 3 DPUs; the third took 347 s while sim-dpu was mis-scheduled on a kwok host"},
+    mem: {mib: 0.1, src: "estimate", label: "≈0", note: "kwok Node; shared sim-dpu 14 Mi joins every M1 DPU"},
+    cpu: {m: 0, src: "measured", label: "≈0", note: "shared sim-dpu 4 m"},
+    infra: "M0 + one sim-dpu pod (shared)",
+    pull: "sim-dpu 27 MiB (once)",
+    scale: "hundreds; each join is two CSRs against the hosted API",
+  },
+  M2a: {
+    ready: {s: 100, src: "measured", note: "100 s; 147 s when the agent asks for a SystemLevelReset reboot"},
+    mem: {mib: 47, src: "measured", note: "one sim-hostagent pod per host: 45–48 Mi working set"},
+    cpu: {m: 3, src: "measured", note: "2–4 m per sim-hostagent pod at rest"},
+    infra: "+1 pod per simulated host (on the control plane)",
+    pull: "hostdriver 1.9 GiB once per node; 731 MiB BFB downloaded per DPU install",
+    scale: "tens per node; disk and bandwidth (BFB per install) dominate",
+  },
+  M2b: {
+    ready: {s: 1200, src: "observed", note: "≈20 min to add the host VM (Assisted day-2 + MCO); its DPU then took ≈4 min via sim-dpu"},
+    mem: {mib: 6230, src: "measured", note: "host VM: 24 GiB allocated, 6.1 GiB RSS on the hypervisor"},
+    cpu: {m: 8000, src: "measured", label: "8 vCPU", note: "allocated (not used); idle in practice"},
+    infra: "+1 x86 RHCOS VM per host (patched QEMU igb), 29 GiB disk used",
+    pull: "a full OCP worker install",
+    scale: "a few per hypervisor; 7 VFs per port (igb)",
+  },
+  M3: {
+    ready: {s: 240, src: "observed", note: "create-dpu-vm.sh on native Arm: VM created → DPU node Ready ≈4 min (boot, MCO rebase, join). Emulated on a laptop (QEMU TCG): ≈30–45 min, mostly the rebase"},
+    mem: {mib: 2270, src: "measured", note: "Arm DPU VM: 2.2 GiB used of 16 GiB (OS + OVN 246 Mi + DTS 55 Mi + small pods); 8 GiB VMs also work"},
+    cpu: {m: 8000, src: "measured", label: "8 vCPU", note: "allocated; load ≈0.15 at rest"},
+    infra: "+1 Arm machine (VM) per DPU; laptop TCG works but is too slow for HBN",
+    pull: "BlueField OCP node image (68 OSTree chunks, not measured) + DPU service images; 28 GiB container storage per DPU VM",
+    scale: "one Arm VM per DPU; the hypervisor's RAM is the limit",
+  },
+  M4: {
+    ready: {s: 972, src: "measured", note: "16 min including manual fixes now baked into the scripts (MAC, fwctl); the DPU joined at 7.7 min"},
+    mem: {mib: 8500, src: "estimate", note: "host VM (6.1 GiB RSS) + DPU machine (2.2 GiB used)"},
+    cpu: {m: 16000, src: "measured", label: "16 vCPU", note: "8 + 8 allocated; the VXLAN wire is negligible"},
+    infra: "M2b host VM + M3 DPU machine + a VXLAN between their hypervisors",
+    pull: "simulate-dpu OVN-K 611 MiB, ovn-dpf-utils 283 MiB, ovs-cni 106 MiB",
+    scale: "one host VM + one Arm VM per pair; 7 VFs per port",
+  },
+  M5: {
+    ready: {s: 47, src: "observed", note: "HBN pod start → NVUE 'valid startup config' on native Arm; on laptop TCG it exceeded HBN's 10 min startup limit"},
+    mem: {mib: 426, src: "measured", note: "HBN 413 Mi working set (request lowered from 6 Gi to 1 Gi) + sf-device-plugin 13 Mi"},
+    cpu: {m: 0, src: "estimate", label: "small", note: "not measured (no metrics API in the hosted cluster)"},
+    infra: "M3 + fake SF device plugin + patched ovs-cni; ≥ 8 GiB RAM per DPU machine",
+    pull: "doca_hbn 273 MiB, ovs-cni 106 MiB",
+    scale: "same as M3; HBN wants a native-speed DPU",
+  },
+};
+
+function fmtTime(s) { return s < 120 ? `${s} s` : s < 3600 ? `${(s / 60).toFixed(s < 600 ? 1 : 0)} min` : `${(s / 3600).toFixed(1)} h`; }
+function fmtMem(mib) { return mib < 1 ? "≈0" : mib < 1024 ? `${Math.round(mib)} MiB` : `${(mib / 1024).toFixed(1)} GiB`; }
+
+// Horizontal bars on a log scale: the values span from ≈0 to gigabytes and
+// from a minute to an hour. ticks: [[value, label]...].
+function bars(title, sub, items, ticks, fmt) {
+  const W = 520, L = 46, R = 92, ROW = 30, T = 8, H = T + items.length * ROW + 26;
+  const lo = Math.log10(ticks[0][0]), hi = Math.log10(ticks[ticks.length - 1][0]);
+  const x = v => L + (Math.log10(Math.max(v, ticks[0][0])) - lo) / (hi - lo) * (W - L - R);
+  const color = {measured: "var(--real)", observed: "var(--partial)", estimate: "var(--fake)"};
+  const grid = ticks.map(([v, t]) => `<line x1="${x(v)}" x2="${x(v)}" y1="${T - 2}" y2="${H - 22}" stroke="var(--line)"/>` +
+    `<text x="${x(v)}" y="${H - 8}" text-anchor="middle" font-size="11" fill="var(--muted)">${t}</text>`).join("");
+  const rows = items.map((it, i) => {
+    const y = T + i * ROW, w = Math.max(x(it.v) - L, 3);
+    return `<text x="${L - 8}" y="${y + 17}" text-anchor="end" font-size="13" font-weight="600" fill="currentColor">${it.k}</text>` +
+      `<rect x="${L}" y="${y + 5}" width="${w}" height="17" rx="4" fill="${color[it.src]}" opacity=".85"><title>${esc(it.k + ": " + it.label + " (" + it.src + ") " + (it.note || ""))}</title></rect>` +
+      `<text x="${L + w + 6}" y="${y + 18}" font-size="12" fill="currentColor">${esc(it.label)}</text>`;
+  }).join("");
+  return `<div class="chart"><h4>${title}</h4><p class="sub">${sub}</p>` +
+    `<svg class="bars" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(title + ": " + items.map(i => i.k + " " + i.label).join(", "))}">${grid}${rows}</svg></div>`;
+}
+
+const KEYS = LEVELS.map(l => l.key);
+document.getElementById("cost-charts").innerHTML =
+  bars("Time to a Ready DPU", "Creation → DPU Ready (M2b: adding the host VM; M5: HBN config applied). Log scale.",
+    KEYS.map(k => ({k, v: COSTS[k].ready.s, src: COSTS[k].ready.src, label: fmtTime(COSTS[k].ready.s), note: COSTS[k].ready.note})),
+    [[30, "30 s"], [60, "1 min"], [300, "5 min"], [900, "15 min"], [3600, "1 h"]]) +
+  bars("Memory per simulated DPU", "What one more DPU (or host+DPU pair) costs while running. Log scale.",
+    KEYS.map(k => ({k, v: COSTS[k].mem.mib, src: COSTS[k].mem.src, label: COSTS[k].mem.label || fmtMem(COSTS[k].mem.mib), note: COSTS[k].mem.note})),
+    [[1, "≈0"], [10, "10 Mi"], [100, "100 Mi"], [1024, "1 Gi"], [16384, "16 Gi"]]);
+
+document.getElementById("cost-table").innerHTML =
+  `<tr><th>Level</th><th>Time to Ready</th><th>Memory / DPU</th><th>CPU / DPU</th><th>Infra needed</th><th>Pulled</th></tr>` +
+  KEYS.map(k => {
+    const c = COSTS[k];
+    const cell = (v, o) => `<span class="n">${v}</span> <span class="src ${o.src}">${o.src.toUpperCase()}</span><br><small style="color:var(--muted)">${o.note}</small>`;
+    return `<tr><td><a href="#${k}">${k}</a></td>` +
+      `<td>${cell(fmtTime(c.ready.s), c.ready)}</td>` +
+      `<td>${cell(c.mem.label || fmtMem(c.mem.mib), c.mem)}</td>` +
+      `<td>${cell(c.cpu.label || (c.cpu.m ? c.cpu.m + " m" : "≈0"), c.cpu)}</td>` +
+      `<td>${c.infra}</td><td>${c.pull}</td></tr>`;
+  }).join("");
+
+document.getElementById("cost-scale").innerHTML =
+  `<b>What scales.</b> M0 and M1 cost almost nothing per DPU: a kwok Node is a few API objects, so one management cluster
+   simulates hundreds of DPUs and they reach Ready in about a minute. M2a adds a small pod per host plus a 731 MiB BFB download per install.
+   From M2b on, every host is a real x86 VM and from M3 on every DPU is a real Arm machine, so cost grows with hypervisor RAM
+   (≈ 6 GiB per host VM, ≈ 2–3 GiB per DPU at rest, 8 GiB+ if HBN runs), and emulated Arm is too slow beyond basic checks.`;
+
+// 100-DPU projections: per-DPU measurements above × 100, plus shared costs.
+// All totals are estimates; `share` lists the tricks that keep them down.
+const SCALE = {
+  M0:  {ram: 2048, cpu: "≈1", disk: "≈1 GiB (etcd)", hosts: "0 extra", up: "≈6 min",
+        lin: "API objects only: 100 kwok Nodes, ~1000 fake pods in the hosted cluster",
+        share: "Already shared: one mock-dms and one kwok per cluster serve every fake. The limit is the hosted control plane and DPF controllers (≈1–2 GiB more etcd/API memory)"},
+  M1:  {ram: 2100, cpu: "≈1", disk: "≈1 GiB (etcd)", hosts: "0 extra", up: "≈6 min",
+        lin: "One kubelet identity (2 CSRs) per DPU; the provisioner approves in 30 s polls",
+        share: "One sim-dpu (14 MiB) joins all DPUs; same control-plane limit as M0"},
+  M2a: {ram: 6800, cpu: "≈1", disk: "≈36 GiB peak", hosts: "0 extra (pods)", up: "≈10 min",
+        lin: "One sim-hostagent pod per host (47 MiB, 3 m CPU); a 731 MiB BFB download per DPU install",
+        share: "All hostagent pods share one 1.9 GiB image. Serve a trimmed BFB (like NVIDIA's mock-dpuagent fixtures) to cut 71 GiB of downloads; DPF's 50-parallel install limit caps the transient disk"},
+  M2b: {ram: 614400, cpu: "800 alloc.", disk: "≈1–2.9 TiB", hosts: "≈2 x86 hypervisors", up: "≈20 min per batch",
+        lin: "A full RHCOS VM per host (6.1 GiB RSS, 29 GiB disk measured)",
+        share: "Thin overlays on one base image; KSM merges identical RHCOS pages; 3–4 GiB guests; a registry mirror or pull-through cache instead of 100× pulls; pack ≈50 per 0.5 TiB hypervisor"},
+  M3:  {ram: 230400, cpu: "400–800 alloc.", disk: "≈0.5–2.8 TiB", hosts: "≈3–4 Ampere (250 GiB)", up: "≈10–15 min",
+        lin: "An Arm VM per DPU (2.2 GiB used; 28 GiB container storage measured)",
+        share: "Thin qcow2 overlays (done); KSM; 3–4 GiB guests; CRI-O additionalimagestores on a read-only virtiofs/NFS share, the assisted-swarm trick, so 100 DPUs don't each store 28 GiB; a pull-through cache"},
+  M4:  {ram: 870400, cpu: "1200–1600 alloc.", disk: "≈1.5–5.7 TiB", hosts: "M2b + M3 hosts", up: "≈20 min",
+        lin: "A host VM and a DPU VM per pair; the VXLAN wires cost nothing",
+        share: "Everything from M2b and M3; one bridge plus VXLAN per hypervisor pair serves all wires (VLANs per VF)"},
+  M5:  {ram: 272000, cpu: "+≈100", disk: "+HBN image once per node", hosts: "M3 hosts", up: "+≈1 min",
+        lin: "One HBN pod per DPU (413 MiB working set with a 1 GiB request)",
+        share: "HBN is the big per-DPU cost; the fake SF plugin is 13 MiB; M6's single FRR leaf container serves every DPU port"},
+};
+document.getElementById("scale-charts").innerHTML =
+  bars("Memory for 100 DPUs", "Total RAM including shared controllers; M4 counts host + DPU pairs. Log scale. Estimate.",
+    KEYS.map(k => ({k, v: SCALE[k].ram, src: "estimate", label: fmtMem(SCALE[k].ram), note: SCALE[k].lin})),
+    [[1024, "1 Gi"], [10240, "10 Gi"], [102400, "100 Gi"], [1048576, "1 Ti"]]);
+document.getElementById("scale-table").innerHTML =
+  `<tr><th>Level</th><th>RAM</th><th>vCPU</th><th>Disk</th><th>Hosts needed</th><th>Bring-up</th><th>What scales linearly</th><th>Sharing tricks</th></tr>` +
+  KEYS.map(k => { const c = SCALE[k];
+    return `<tr><td><a href="#${k}">${k}</a></td><td class="n">${fmtMem(c.ram)} <span class="src estimate">EST</span></td>` +
+      `<td class="n">${c.cpu}</td><td>${c.disk}</td><td>${c.hosts}</td><td>${c.up}</td><td>${c.lin}</td><td>${c.share}</td></tr>`;
+  }).join("");
+document.getElementById("swarm-note").innerHTML =
+  `<b>Swarm mode, a midpoint between M2a and M3.</b> Like <code>assisted-swarm</code> (one machine running many real agents in
+   dry-run, sharing a read-only image store and a single watch cache), one Arm VM could host many DPU kubelets, each a container
+   with its own network namespace and graphroot over a shared <code>additionalimagestores</code>. That gives real kubelets and real DPU
+   pods at perhaps 200–400 MiB per DPU instead of 2–3 GiB, i.e. ≈20–40 GiB for 100 DPUs on one Ampere host.
+   <span class="src estimate">ESTIMATE</span> Not built yet; the main risk is that host-level DPU services (OVS, kernel modules) can't be shared per container.`;
 
 const SHORT = {real: "REAL", partial: "SIM HW", fake: "FAKE", na: "—"};
 document.getElementById("ladder-table").innerHTML =
@@ -456,13 +668,30 @@ document.getElementById("ladder-table").innerHTML =
     return `<td class="${st}" title="${esc(l.key + ": " + STATES[st] + (l.sub[id] ? " (" + l.sub[id] + ")" : ""))}">${SHORT[st]}</td>`;
   }).join("")}</tr>`).join("");
 
-document.getElementById("levels").innerHTML = LEVELS.map(l => `
-  <section id="${l.key}">
+document.getElementById("levels").innerHTML = LEVELS.map((l, i) => `
+  <section id="${l.key}" class="tab-panel" data-tab="${l.key}" hidden>
     <h2>${l.key} · ${l.title} <span class="tag">${l.tag}</span><span class="live" id="live-${l.key}">…</span></h2>
     <p class="lede">${l.lede}</p>
-    <div class="pair">
-      <div class="fig scroll"><div class="cap">Real system</div>${diagram(ALL_REAL, {})}</div>
-      <div class="fig scroll"><div class="cap">${l.key}</div>${diagram(l.states, l.sub)}</div>
+    <div class="costline">
+      <span>Ready in <b>${fmtTime(COSTS[l.key].ready.s)}</b> <span class="src ${COSTS[l.key].ready.src}">${COSTS[l.key].ready.src.toUpperCase()}</span></span>
+      <span>Memory / DPU <b>${COSTS[l.key].mem.label || fmtMem(COSTS[l.key].mem.mib)}</b></span>
+      <span>Needs <b>${COSTS[l.key].infra}</b></span>
+      <a href="#costs">all costs →</a>
+    </div>
+    <div class="fig">
+      <div class="figbar">
+        <div class="seg" role="group" aria-label="Diagram">
+          <button type="button" data-view="real" aria-pressed="false">Real system</button>
+          <button type="button" data-view="this" aria-pressed="true">${l.key}</button>
+          <button type="button" data-view="prev" aria-pressed="false" ${i ? "" : "disabled title=\"M0 is the first level\""}>${i ? "vs " + LEVELS[i - 1].key : "Previous"}</button>
+        </div>
+        <span class="hint"><kbd>r</kbd> real · <kbd>s</kbd> ${l.key} · <kbd>p</kbd> previous · <kbd>space</kbd> flip · <kbd>←</kbd><kbd>→</kbd> tabs</span>
+      </div>
+      <div class="scroll"><div class="stage" data-view="this">
+        <div class="view" data-v="real">${diagram(ALL_REAL, {})}</div>
+        <div class="view" data-v="this">${diagram(l.states, l.sub)}</div>
+        <div class="view" data-v="prev">${i ? diagram(LEVELS[i - 1].states, LEVELS[i - 1].sub) : ""}</div>
+      </div></div>
     </div>
     <div class="legend">${legend()}</div>
     <h3>How it works</h3>
@@ -498,6 +727,58 @@ async function live() {
 }
 live();
 setInterval(live, 5000);
+
+// Tabs: one panel at a time; the URL hash names the tab (#ladder lives on Overview).
+function tabOf(hash) {
+  const h = (hash || "").replace(/^#/, "");
+  if (h === "ladder") return "overview";
+  return TABS.includes(h) ? h : "overview";
+}
+function showTab(tab, anchor) {
+  document.querySelectorAll(".tab-panel").forEach(p => { p.hidden = p.dataset.tab !== tab; });
+  document.querySelectorAll("#toc a").forEach(a => {
+    const on = a.dataset.tab === tab;
+    a.setAttribute("aria-selected", on);
+    if (on) a.scrollIntoView({block: "nearest", inline: "nearest"});
+  });
+  const target = anchor && document.getElementById(anchor);
+  if (target && anchor !== tab) target.scrollIntoView();
+  else window.scrollTo(0, 0);
+}
+function route() { const h = location.hash.replace(/^#/, ""); showTab(tabOf(h), h); }
+window.addEventListener("hashchange", route);
+route();
+
+// Diagram toggle: the three views share one slot and viewBox, so flipping
+// shows exactly which boxes change.
+function setView(section, view) {
+  const stage = section.querySelector(".stage");
+  const btn = section.querySelector(`.seg button[data-view="${view}"]`);
+  if (!stage || !btn || btn.disabled) return;
+  stage.dataset.view = view;
+  section.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-pressed", b === btn));
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest(".seg button");
+  if (b) setView(b.closest("section"), b.dataset.view);
+});
+document.addEventListener("keydown", e => {
+  if (e.altKey || e.ctrlKey || e.metaKey || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  const tab = tabOf(location.hash);
+  if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+    const i = TABS.indexOf(tab) + (e.key === "ArrowRight" ? 1 : -1);
+    if (i >= 0 && i < TABS.length) { location.hash = TABS[i]; e.preventDefault(); }
+    return;
+  }
+  const section = document.querySelector(`.tab-panel[data-tab="${tab}"] .stage`)?.closest("section");
+  if (!section) return;
+  const views = {r: "real", s: "this", p: "prev"};
+  if (views[e.key]) { setView(section, views[e.key]); return; }
+  if (e.key === " ") {
+    setView(section, section.querySelector(".stage").dataset.view === "real" ? "this" : "real");
+    e.preventDefault();
+  }
+});
 
 const root = document.documentElement;
 try { const t = localStorage.getItem("sim-theme"); if (t) root.dataset.theme = t; } catch (e) {}
