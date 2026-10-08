@@ -12,6 +12,7 @@
 #   --memory MiB       (default: 16384)
 #   --mgmt-bridge BR   LAN bridge on the hypervisor (default: mgmt-br)
 #   --wire-bridge BR   bridge linked to the host's PFs (M4; default: none)
+#   --fabric-bridge BR bridge to the fabric leaf; that NIC is p0 (M6; default: none)
 #   --delete           remove the VM and its disk/ignition instead
 # env:   KUBECONFIG (management cluster); see build-ignition.sh
 set -euo pipefail
@@ -23,6 +24,7 @@ VCPUS=8
 MEMORY=16384
 MGMT_BRIDGE=mgmt-br
 WIRE_BRIDGE=""
+FABRIC_BRIDGE=""
 DELETE=false
 IMAGES=/var/lib/libvirt/images
 RHCOS_STREAM=${RHCOS_STREAM:-4.22}
@@ -35,6 +37,7 @@ while [[ $# -gt 1 ]]; do
         --memory) MEMORY=$2; shift 2 ;;
         --mgmt-bridge) MGMT_BRIDGE=$2; shift 2 ;;
         --wire-bridge) WIRE_BRIDGE=$2; shift 2 ;;
+        --fabric-bridge) FABRIC_BRIDGE=$2; shift 2 ;;
         --delete) DELETE=true; shift ;;
         *) echo "unknown option $1" >&2; exit 1 ;;
     esac
@@ -58,14 +61,12 @@ mac() {
 }
 MGMT_MAC=$(mac mgmt)
 WIRE_MAC=$(mac wire)
+FABRIC_MAC=$(mac fabric)
 
 ign=$(mktemp)
 trap 'rm -f "${ign}"' EXIT
-if [[ -n "${WIRE_BRIDGE}" ]]; then
-    SIM_WIRE_MAC=${WIRE_MAC} "${HERE}/build-ignition.sh" "${DPU}" "${MGMT_MAC}" "${ign}"
-else
+SIM_WIRE_MAC=${WIRE_BRIDGE:+${WIRE_MAC}} SIM_FABRIC_MAC=${FABRIC_BRIDGE:+${FABRIC_MAC}} \
     "${HERE}/build-ignition.sh" "${DPU}" "${MGMT_MAC}" "${ign}"
-fi
 scp -q "${ign}" "${HV}:${IGN}"
 
 # The base image is shared by every DPU VM on the hypervisor (thin overlays).
@@ -84,6 +85,9 @@ wire_net=""
 if [[ -n "${WIRE_BRIDGE}" ]]; then
     wire_net="--network bridge=${WIRE_BRIDGE},model=virtio,mac=${WIRE_MAC}"
 fi
+if [[ -n "${FABRIC_BRIDGE}" ]]; then
+    wire_net="${wire_net} --network bridge=${FABRIC_BRIDGE},model=virtio,mac=${FABRIC_MAC}"
+fi
 # shellcheck disable=SC2087 # expand locally on purpose
 ssh "${HV}" bash -s <<EOF
 set -euo pipefail
@@ -101,5 +105,5 @@ virt-install --name ${NAME} --arch aarch64 --machine virt --boot uefi --import \
     --qemu-commandline="-fw_cfg name=opt/com.coreos/config,file=${IGN}" \\
     --graphics none --noautoconsole
 EOF
-echo "VM ${NAME} on ${HV}: mgmt ${MGMT_MAC}${WIRE_BRIDGE:+, wire ${WIRE_MAC} on ${WIRE_BRIDGE}}"
+echo "VM ${NAME} on ${HV}: mgmt ${MGMT_MAC}${WIRE_BRIDGE:+, wire ${WIRE_MAC} on ${WIRE_BRIDGE}}${FABRIC_BRIDGE:+, fabric p0 ${FABRIC_MAC} on ${FABRIC_BRIDGE}}"
 echo "it joins the DPU cluster as Node ${DPU}; its address is that Node's InternalIP (DHCP on ${MGMT_BRIDGE})"

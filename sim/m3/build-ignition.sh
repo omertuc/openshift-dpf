@@ -7,7 +7,8 @@
 # env:   KUBECONFIG (management cluster),
 #        BFB_REGISTRY (default http://<control-plane IP>:<bfb-registry NodePort>),
 #        SSH_PUBKEY (added for core; default ~/.ssh/id_ed25519.pub),
-#        SIM_WIRE_MAC (NIC linked to the host's PFs, M4)
+#        SIM_WIRE_MAC (NIC linked to the host's PFs, M4),
+#        SIM_FABRIC_MAC (NIC that is the p0 uplink to the fabric, M6)
 set -euo pipefail
 
 DPU=$1
@@ -36,6 +37,7 @@ trap 'rm -rf "${tmp}"' EXIT
 curl -sSf -m 60 -o "${tmp}/bf.cfg" "${BFB_REGISTRY}${bfcfg}"
 python3 -I "${HERE}/dpu-ignition.py" --mgmt-mac "${MGMT_MAC}" \
     ${SIM_WIRE_MAC:+--wire-mac "${SIM_WIRE_MAC}" --host-node "${host_node}"} \
+    ${SIM_FABRIC_MAC:+--fabric-mac "${SIM_FABRIC_MAC}"} \
     "${tmp}/bf.cfg" "${OUT}"
 python3 -I - "${OUT}" "${SSH_PUBKEY}" <<'EOF'
 import json, sys

@@ -74,9 +74,17 @@ if [[ -n "${SIM_WIRE_MAC:-}" ]]; then
   done
 fi
 
-# Fabric uplinks: veths whose far ends (p0-fab, p1-fab) get wired to a fabric.
-veth p0 p0-fab
-veth p1 p1-fab
+# Fabric uplinks: a NIC already named p0/p1 (create-dpu-vm.sh --fabric-bridge,
+# M6) is the uplink itself; otherwise a veth whose far end goes nowhere.
+for port in p0 p1; do
+  if ip -d link show "${port}" 2>/dev/null | grep -q " veth "; then
+    ip link set "${port}" up
+  elif ip link show "${port}" &>/dev/null; then
+    ip link set "${port}" mtu "${MTU}" up 2>/dev/null || ip link set "${port}" up
+  else
+    veth "${port}" "${port}-fab"
+  fi
+done
 
 _ovs-vsctl set Open_vSwitch . external-ids:ovn-bridge-datapath-type=system
 for br in br-sfc br-hbn; do

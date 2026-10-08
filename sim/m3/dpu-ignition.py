@@ -27,7 +27,11 @@ It also stands in for what the masked units and the BlueField itself set up:
 - with --host-node, the MAC OVN-K's --simulate-dpu mode expects on the host
   PF (52:54:00 + sha256(<host node>\0host)[0:2] + :00) goes into sim.env
 
-usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] [--wire-mac MAC [--host-node NAME]] <bf.cfg> <out.ign>
+- with --fabric-mac, the NIC with that MAC is the BlueField's p0 uplink (M6):
+  named p0, it is the port dpf-ovs-sim.sh puts in br-sfc instead of a veth
+
+usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] [--wire-mac MAC [--host-node NAME]]
+                       [--fabric-mac MAC] <bf.cfg> <out.ign>
 """
 import argparse
 import base64
@@ -106,7 +110,7 @@ def simulated_host_pf_mac(host_node):
     return f"52:54:00:{h[0]:02x}:{h[1]:02x}:00"
 
 
-def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None, host_node=None):
+def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None, host_node=None, fabric_mac=None):
     with open(bfcfg) as f:
         live = json.load(f)
     target = json.loads(file_contents(live, "/var/target.ign"))
@@ -145,6 +149,9 @@ def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None, host_node=None
         add_file(files, "/etc/NetworkManager/conf.d/99-dpf-sim-unmanaged.conf",
                  ("[keyfile]\nunmanaged-devices=mac:" + wire_mac +
                   ";interface-name:dpuwire;interface-name:rep*;interface-name:pf0hpf-w\n").encode())
+    if fabric_mac:
+        add_file(files, "/etc/systemd/network/05-sim-p0.link",
+                 f"[Match]\nMACAddress={fabric_mac}\n\n[Link]\nName=p0\nNamePolicy=\nMTUBytes=9000\n".encode())
     units.append({"name": "dpf-ovs-sim.service", "enabled": True, "contents": OVS_SIM_UNIT})
     missing = HARDWARE_UNITS - set(masked)
     if missing:
@@ -161,7 +168,8 @@ if __name__ == "__main__":
     p.add_argument("--mgmt-mtu", type=int, default=1500)
     p.add_argument("--wire-mac")
     p.add_argument("--host-node")
+    p.add_argument("--fabric-mac")
     p.add_argument("bfcfg")
     p.add_argument("out")
     a = p.parse_args()
-    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu, a.wire_mac, a.host_node)
+    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu, a.wire_mac, a.host_node, a.fabric_mac)
