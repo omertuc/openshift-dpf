@@ -37,3 +37,7 @@ _ovs-vsctl --may-exist add-port br-dpu pbrdputobrovn -- set Interface pbrdputobr
 for br in br-ovn br-dpu p0 p1 pf0hpf; do
   ip link set "${br}" up
 done
+
+# OVN-K's --simulate-dpu mode finds representors by name or alias: rep0-0 is
+# the host PF's (pf0hpf on a BlueField).
+ip link set pf0hpf alias rep0-0

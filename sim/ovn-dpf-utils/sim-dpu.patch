@@ -1,0 +1,80 @@
+diff --git a/dpf-utils/cmd/dpucniprovisioner/main.go b/dpf-utils/cmd/dpucniprovisioner/main.go
+index 523e411..e61aeb4 100644
+--- a/dpf-utils/cmd/dpucniprovisioner/main.go
++++ b/dpf-utils/cmd/dpucniprovisioner/main.go
+@@ -133,7 +133,11 @@ func main() {
+ 		klog.Fatal(err)
+ 	}
+ 
+-	provisioner := dpucniprovisioner.New(ctx, mode, c, ovsClient, networkhelper.New(), exec, clientset, vtepIPNet, gateway, vtepCIDR, hostCIDR, pfIPNet, node, gatewayDiscoveryNetwork, ovnMTU)
++	nh := networkhelper.New()
++	if simDPU() {
++		nh = newSimNetworkHelper(nh)
++	}
++	provisioner := dpucniprovisioner.New(ctx, mode, c, ovsClient, nh, exec, clientset, vtepIPNet, gateway, vtepCIDR, hostCIDR, pfIPNet, node, gatewayDiscoveryNetwork, ovnMTU)
+ 	provisioner.K8sAPIServer = os.Getenv("K8S_APISERVER")
+ 	hostClusterClient, err := newHostClusterClient(provisioner.K8sAPIServer)
+ 	if err != nil {
+diff --git a/dpf-utils/cmd/dpucniprovisioner/sim.go b/dpf-utils/cmd/dpucniprovisioner/sim.go
+new file mode 100644
+index 0000000..facbf2f
+--- /dev/null
++++ b/dpf-utils/cmd/dpucniprovisioner/sim.go
+@@ -0,0 +1,57 @@
++package main
++
++// Simulated DPUs: a DPU without BlueField hardware (e.g. an Arm VM, see
++// openshift-dpf sim/), where pf0hpf, p0 and p1 are plain netdevs (OVS internal
++// ports) with no switchdev metadata (phys_switch_id/phys_port_name), so
++// sriovnet cannot find the host PF representor nor its peer MAC.
++//
++// Enabled with DPF_SIM_DPU=true (the simulation image sets it). Real mode is
++// unchanged when it is unset.
++
++import (
++	"fmt"
++	"net"
++	"os"
++
++	"github.com/nvidia/doca-platform/pkg/utils/networkhelper"
++	"github.com/vishvananda/netlink"
++	"k8s.io/klog/v2"
++)
++
++const (
++	simDPUEnv = "DPF_SIM_DPU"
++	// simHostPFMACEnv is the MAC of the host PF (PF0) the DHCP server hands
++	// the PF IP to. Without it, the MAC of the host PF representor is used.
++	simHostPFMACEnv = "DPF_SIM_HOST_PF_MAC"
++)
++
++func simDPU() bool {
++	return os.Getenv(simDPUEnv) == "true"
++}
++
++// simNetworkHelper resolves representors by netdev name instead of switchdev.
++type simNetworkHelper struct {
++	networkhelper.NetworkHelper
++}
++
++func newSimNetworkHelper(nh networkhelper.NetworkHelper) networkhelper.NetworkHelper {
++	klog.Infof("%s=true: resolving representors by name (pf<N>hpf), not switchdev", simDPUEnv)
++	return &simNetworkHelper{NetworkHelper: nh}
++}
++
++func (s *simNetworkHelper) GetHostPFMACAddressDPU(pfID string) (net.HardwareAddr, error) {
++	if v := os.Getenv(simHostPFMACEnv); v != "" && pfID == "0" {
++		mac, err := net.ParseMAC(v)
++		if err != nil {
++			return nil, fmt.Errorf("invalid %s %q: %w", simHostPFMACEnv, v, err)
++		}
++		return mac, nil
++	}
++	rep := fmt.Sprintf("pf%shpf", pfID)
++	link, err := netlink.LinkByName(rep)
++	if err != nil {
++		return nil, fmt.Errorf("simulated PF representor %s for pfID %s: %w", rep, pfID, err)
++	}
++	klog.Warningf("%s unset: using the MAC of representor %s as the host PF MAC", simHostPFMACEnv, rep)
++	return link.Attrs().HardwareAddr, nil
++}

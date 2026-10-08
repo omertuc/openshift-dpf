@@ -1,0 +1,8 @@
+# DPF's ovn-kubernetes-dpf-utils image (DPU side of OVN-K: cniprovisioner,
+# ipallocator) with a cniprovisioner that supports simulated DPUs
+# (sim-dpu.patch), enabled here by default.
+ARG BASE=ghcr.io/mellanox/ovn-kubernetes-dpf-utils@sha256:f489c24536bb26603054820fa81e503d6c1abe1fd90d0b82acac19afb543c742
+FROM ${BASE}
+COPY cniprovisioner /cniprovisioner
+ENV DPF_SIM_DPU=true
+LABEL org.opencontainers.image.description="ovn-kubernetes-dpf-utils v26.4.1-ocp-release-v4.22 + cniprovisioner sim-DPU mode (openshift-dpf sim/ovn-dpf-utils)"
