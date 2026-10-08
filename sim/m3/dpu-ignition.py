@@ -115,6 +115,9 @@ def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None, host_node=None
     files = target.setdefault("storage", {}).setdefault("files", [])
     files[:] = [f for f in files if f["path"] not in HARDWARE_DROPINS]
     add_file(files, "/etc/hostname", hostname)
+    # DOCA telemetry (DTS) mounts /sys/class/fwctl, which exists once the
+    # fwctl class is loaded (on a BlueField, by the mlx5 fwctl driver).
+    add_file(files, "/etc/modules-load.d/fwctl.conf", b"fwctl\n")
     with open(os.path.join(HERE, "dpf-ovs-sim.sh"), "rb") as f:
         add_file(files, "/usr/local/bin/dpf-ovs-sim.sh", f.read(), 0o755)
     if mgmt_mac:
