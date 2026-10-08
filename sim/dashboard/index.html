@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DPU Simulation</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #6b7385; --line: #e3e6ec;
+    --ok: #1f8a4c; --warn: #b7791f; --bad: #c53030; --info: #2b6cb0; --chip: #eef1f6;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #9aa3b5; --line: #2a303b;
+      --ok: #48bb78; --warn: #ecc94b; --bad: #fc8181; --info: #63b3ed; --chip: #232936;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 16px 20px 4px; flex-wrap: wrap; }
+  h1 { font-size: 18px; margin: 0; }
+  .muted { color: var(--muted); }
+  main { display: grid; gap: 16px; padding: 12px 20px 24px;
+         grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+            padding: 14px 16px; min-width: 0; }
+  section.wide { grid-column: 1 / -1; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-weight: 600; color: var(--muted); font-size: 12px; }
+  .chip { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--chip); font-size: 12px; white-space: nowrap; }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); } .info { color: var(--info); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; background: currentColor; }
+  .levels { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .level { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+  .level b { font-size: 16px; }
+  pre { margin: 6px 0 0; padding: 8px; background: var(--chip); border-radius: 6px; font: 11.5px/1.35 var(--mono);
+        white-space: pre-wrap; word-break: break-all; max-height: 230px; overflow: auto; }
+  .vm { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+  .vm:first-of-type { border-top: 0; margin-top: 0; padding-top: 0; }
+  .kv { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .events { max-height: 320px; overflow: auto; font: 12.5px/1.5 var(--mono); }
+  .events div { padding: 2px 0; border-bottom: 1px dashed var(--line); }
+  .err { color: var(--bad); font-size: 12px; }
+  .name { font-family: var(--mono); font-size: 12.5px; word-break: break-all; }
+  @media (max-width: 520px) { main { grid-template-columns: 1fr; padding: 12px 16px; } header { padding: 14px 16px 2px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>DPU Simulation</h1>
+  <span class="muted" id="updated">connecting…</span>
+  <span class="err" id="errors"></span>
+</header>
+<main>
+  <section class="wide">
+    <h2>DPUs by simulation level</h2>
+    <div class="levels" id="levels"></div>
+    <table><thead><tr><th>DPU</th><th>Level</th><th>Phase</th><th>Host</th></tr></thead><tbody id="dpus"></tbody></table>
+  </section>
+  <section>
+    <h2>DPU machines (laptop VMs and real Arm)</h2>
+    <div id="vms"></div>
+  </section>
+  <section>
+    <h2>Hosted cluster nodes</h2>
+    <table><thead><tr><th>Node</th><th>Kind</th><th>Ready</th><th>Kubelet</th></tr></thead><tbody id="nodes"></tbody></table>
+    <h2 style="margin-top:16px">Recent CSRs</h2>
+    <table><thead><tr><th>CSR</th><th>Signer</th><th>Requestor</th><th>Status</th></tr></thead><tbody id="csrs"></tbody></table>
+  </section>
+  <section class="wide">
+    <h2>Events (since this page's server started)</h2>
+    <div class="events" id="events"><span class="muted">waiting for changes…</span></div>
+  </section>
+</main>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const phaseClass = p => p === "Ready" ? "ok" : p === "Error" ? "bad" : p ? "warn" : "muted";
+const unitClass = s => s === "active" ? "ok" : (s === "failed" ? "bad" : (s === "activating" ? "warn" : "muted"));
+const LEVELS = {m0: "kwok DPU", m1: "+ real ignition/CSR", m2a: "+ real hostagent", m2b: "+ real host VM", m3: "+ real Arm DPU"};
+
+function render(s) {
+  document.getElementById("updated").textContent = "updated " + (s.updated || "—");
+  document.getElementById("errors").textContent = (s.errors || []).join(" · ");
+
+  const by = {};
+  for (const d of s.dpus) { (by[d.level] ||= []).push(d); }
+  document.getElementById("levels").innerHTML = Object.keys(by).sort().map(l => {
+    const ready = by[l].filter(d => d.phase === "Ready").length;
+    return `<div class="level"><b>${esc(l)}</b> <span class="muted">${esc(LEVELS[l] || "")}</span><br>
+      <span class="${ready === by[l].length ? "ok" : "warn"}">${ready}/${by[l].length} Ready</span></div>`;
+  }).join("");
+  document.getElementById("dpus").innerHTML = s.dpus
+    .sort((a, b) => (a.level + a.name).localeCompare(b.level + b.name))
+    .map(d => `<tr><td class="name">${esc(d.name)}</td><td><span class="chip">${esc(d.level)}</span></td>
+      <td class="${phaseClass(d.phase)}"><span class="dot"></span>${esc(d.phase || "—")}</td><td class="name muted">${esc(d.host)}</td></tr>`).join("");
+
+  document.getElementById("nodes").innerHTML = s.nodes.map(n => `<tr><td class="name">${esc(n.name)}</td>
+      <td><span class="chip ${n.kind === "real" ? "info" : ""}">${esc(n.kind)}</span></td>
+      <td class="${n.ready === "True" ? "ok" : "bad"}"><span class="dot"></span>${esc(n.ready)}</td>
+      <td class="muted">${esc(n.kubelet)} ${esc(n.arch)}</td></tr>`).join("");
+  document.getElementById("csrs").innerHTML = s.csrs.slice(0, 10).map(c => `<tr><td class="name">${esc(c.name)}</td>
+      <td>${esc(c.signer)}</td><td class="name muted">${esc(c.requestor)}</td>
+      <td class="${c.status.includes("Approved") ? "ok" : (c.status.includes("Denied") ? "bad" : "warn")}">${esc(c.status)}</td></tr>`).join("");
+
+  document.getElementById("vms").innerHTML = s.vms.length ? s.vms.map(v => {
+    const units = Object.entries(v.info).filter(([k]) => k.startsWith("unit."))
+      .map(([k, val]) => `<span class="chip ${unitClass(val)}">${esc(k.slice(5))}: ${esc(val)}</span>`).join("");
+    return `<div class="vm"><b>${esc(v.name)}</b> <span class="muted">${esc(v.ssh)}</span>
+      <span class="${v.reachable ? "ok" : "muted"}">${v.reachable ? "● reachable" : "○ not reachable yet"}</span>
+      ${v.info.hostname ? `<div class="muted name">hostname ${esc(v.info.hostname)}</div>` : ""}
+      ${v.info.booted ? `<div class="muted name">booted ${esc(v.info.booted)}</div>` : ""}
+      <div class="kv">${units}</div><pre>${esc(v.console.join("\n"))}</pre></div>`;
+  }).join("") : `<span class="muted">none configured</span>`;
+
+  if (s.events.length) {
+    document.getElementById("events").innerHTML = s.events
+      .map(e => `<div><span class="muted">${esc(e.t)}</span> ${esc(e.what)}</div>`).join("");
+  }
+}
+
+async function tick() {
+  try {
+    const r = await fetch("/status.json", {cache: "no-store"});
+    render(await r.json());
+  } catch (e) {
+    document.getElementById("errors").textContent = "dashboard server unreachable";
+  }
+}
+tick();
+setInterval(tick, 3000);
+</script>
+</body>
+</html>

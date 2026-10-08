@@ -10,9 +10,18 @@ ignition as generated, adds the hostname, and masks only the units that need
 that hardware. Everything else (kubelet bootstrap, MCO firstboot and the
 rebase onto the BlueField OCP image) runs as on a real DPU.
 
-usage: dpu-ignition.py <bf.cfg> <out.ign>
+It also stands in for what the masked units and the BlueField itself set up:
+- dpf-ovs-sim.service builds DPF's OVS bridges (see dpf-ovs-sim.sh)
+- with --mgmt-mac, the machine's NIC with that MAC becomes pf0vf0, the port of
+  the br-comm-ch management bridge (on a BlueField, the representor of the
+  host VF the hostagent bridges into the host network); br-comm-ch takes that
+  MAC so DHCP keeps handing out the machine's address
+
+usage: dpu-ignition.py [--mgmt-mac MAC] <bf.cfg> <out.ign>
 """
+import argparse
 import base64
+import os
 import gzip
 import json
 import sys
@@ -56,7 +65,29 @@ def data_url(raw):
     return "data:;base64," + base64.b64encode(raw).decode()
 
 
-def main(bfcfg, out):
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+OVS_SIM_UNIT = """[Unit]
+Description=DPF OVS setup without BlueField hardware (simulation)
+After=network.target openvswitch.service
+Requires=openvswitch.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/dpf-ovs-sim.sh
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+def add_file(files, path, raw, mode=0o644):
+    files[:] = [f for f in files if f["path"] != path]
+    files.append({"path": path, "mode": mode, "overwrite": True, "contents": {"source": data_url(raw)}})
+
+
+def main(bfcfg, out, mgmt_mac=None):
     with open(bfcfg) as f:
         live = json.load(f)
     target = json.loads(file_contents(live, "/var/target.ign"))
@@ -64,12 +95,16 @@ def main(bfcfg, out):
 
     files = target.setdefault("storage", {}).setdefault("files", [])
     files[:] = [f for f in files if f["path"] not in HARDWARE_DROPINS]
-    files.append({
-        "path": "/etc/hostname",
-        "mode": 0o644,
-        "overwrite": True,
-        "contents": {"source": data_url(hostname)},
-    })
+    add_file(files, "/etc/hostname", hostname)
+    with open(os.path.join(HERE, "dpf-ovs-sim.sh"), "rb") as f:
+        add_file(files, "/usr/local/bin/dpf-ovs-sim.sh", f.read(), 0o755)
+    if mgmt_mac:
+        add_file(files, "/etc/systemd/network/05-sim-pf0vf0.link",
+                 f"[Match]\nMACAddress={mgmt_mac}\n\n[Link]\nName=pf0vf0\nNamePolicy=\n".encode())
+        brcomm = "/etc/NetworkManager/system-connections/br-comm-ch.nmconnection"
+        conf = file_contents(target, brcomm).decode()
+        conf = conf.replace("cloned-mac-address=stable", f"cloned-mac-address={mgmt_mac}")
+        add_file(files, brcomm, conf.encode(), 0o600)
 
     units = target.setdefault("systemd", {}).setdefault("units", [])
     masked = []
@@ -77,6 +112,7 @@ def main(bfcfg, out):
         if u["name"] in HARDWARE_UNITS:
             units[i] = {"name": u["name"], "mask": True}
             masked.append(u["name"])
+    units.append({"name": "dpf-ovs-sim.service", "enabled": True, "contents": OVS_SIM_UNIT})
     missing = HARDWARE_UNITS - set(masked)
     if missing:
         print(f"warning: not in the target ignition: {sorted(missing)}", file=sys.stderr)
@@ -87,6 +123,9 @@ def main(bfcfg, out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        sys.exit(__doc__)
-    main(sys.argv[1], sys.argv[2])
+    p = argparse.ArgumentParser(usage=__doc__)
+    p.add_argument("--mgmt-mac")
+    p.add_argument("bfcfg")
+    p.add_argument("out")
+    a = p.parse_args()
+    main(a.bfcfg, a.out, a.mgmt_mac)
