@@ -6,6 +6,8 @@ x-vpd-serial=<serial> (a BlueField's two PFs report the same serial).
 Function 0 also gets x-pcie-ari-nextfn-1: igb has an ARI capability, and
 with ARI the guest only finds the functions the ARI next-function chain
 names, which is just function 0 by default.
+Both also get x-vf-loopback=off: a BlueField sends all VF traffic to its
+eswitch (on the DPU), never VF to VF inside the NIC, so neither may igb.
 
 Run on the hypervisor. Prints the new domain XML; define it with virsh.
 
@@ -61,6 +63,7 @@ def main(path, emulator, serial, mac0, mac1):
         dev = ET.SubElement(override, f"{{{QEMU_NS}}}device", {"alias": name})
         fe = ET.SubElement(dev, f"{{{QEMU_NS}}}frontend")
         ET.SubElement(fe, f"{{{QEMU_NS}}}property", {"name": "x-vpd-serial", "type": "string", "value": serial})
+        ET.SubElement(fe, f"{{{QEMU_NS}}}property", {"name": "x-vf-loopback", "type": "bool", "value": "false"})
         if name == "ua-bf3p0":
             ET.SubElement(fe, f"{{{QEMU_NS}}}property", {"name": "x-pcie-ari-nextfn-1", "type": "bool", "value": "true"})
 
