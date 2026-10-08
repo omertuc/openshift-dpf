@@ -17,7 +17,10 @@ It also stands in for what the masked units and the BlueField itself set up:
   host VF the hostagent bridges into the host network); br-comm-ch takes that
   MAC so DHCP keeps handing out the machine's address
 
-usage: dpu-ignition.py [--mgmt-mac MAC] <bf.cfg> <out.ign>
+  and pf0vf0 takes the MTU of the network the machine is on (--mgmt-mtu;
+  inside a BlueField it is 9000)
+
+usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] <bf.cfg> <out.ign>
 """
 import argparse
 import base64
@@ -89,7 +92,7 @@ def add_file(files, path, raw, mode=0o644):
     files.append({"path": path, "mode": mode, "overwrite": True, "contents": {"source": data_url(raw)}})
 
 
-def main(bfcfg, out, mgmt_mac=None):
+def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500):
     with open(bfcfg) as f:
         live = json.load(f)
     target = json.loads(file_contents(live, "/var/target.ign"))
@@ -107,6 +110,9 @@ def main(bfcfg, out, mgmt_mac=None):
         conf = file_contents(target, brcomm).decode()
         conf = conf.replace("cloned-mac-address=stable", f"cloned-mac-address={mgmt_mac}")
         add_file(files, brcomm, conf.encode(), 0o600)
+        port = "/etc/NetworkManager/system-connections/pf0vf0.nmconnection"
+        conf = file_contents(target, port).decode().replace("mtu=9000", f"mtu={mgmt_mtu}")
+        add_file(files, port, conf.encode(), 0o600)
 
     units = target.setdefault("systemd", {}).setdefault("units", [])
     masked = []
@@ -127,7 +133,8 @@ def main(bfcfg, out, mgmt_mac=None):
 if __name__ == "__main__":
     p = argparse.ArgumentParser(usage=__doc__)
     p.add_argument("--mgmt-mac")
+    p.add_argument("--mgmt-mtu", type=int, default=1500)
     p.add_argument("bfcfg")
     p.add_argument("out")
     a = p.parse_args()
-    main(a.bfcfg, a.out, a.mgmt_mac)
+    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu)
