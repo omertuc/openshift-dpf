@@ -12,7 +12,7 @@ use std::process::Command;
 use anyhow::{Context, Result, bail};
 use clap::{Args, Subcommand};
 
-use crate::cluster::{bfb_registry_url, fetch_bfcfg, get_dpu};
+use crate::cluster::{self, bfb_registry_url, fetch_bfcfg, get_dpu};
 use crate::cmd::{CommandExt, command};
 use crate::ignition::{DpuMachineArgs, authorize_ssh_key, dpu_ignition, write_ignition};
 use crate::mac::dpu_vm_nic_mac;
@@ -105,8 +105,19 @@ fn read_ssh_pubkey(explicit_path: Option<&Path>) -> Result<String> {
 pub enum DpuVmCommand {
     /// Create a VM that boots as the DPU. The DPU object must have a bf.cfg.
     Create(CreateVmArgs),
-    /// Remove the VM and its disk and ignition.
-    Delete(VmTarget),
+    /// Remove the VM and its disk and ignition, and its Node and the per-node
+    /// DPF objects in the DPU cluster.
+    Delete(DeleteVmArgs),
+}
+
+#[derive(Args)]
+pub struct DeleteVmArgs {
+    #[command(flatten)]
+    target: VmTarget,
+    /// Also delete the DPU object, so DPF provisions it again and a new VM
+    /// can join as it (`dpu-vm create` once it reaches "DPU Cluster Config").
+    #[arg(long)]
+    reprovision: bool,
 }
 
 #[derive(Args)]
@@ -194,7 +205,7 @@ impl CreateVmArgs {
 pub fn run(dpu_vm_command: &DpuVmCommand) -> Result<()> {
     match dpu_vm_command {
         DpuVmCommand::Create(create_args) => create(create_args),
-        DpuVmCommand::Delete(target) => delete(target),
+        DpuVmCommand::Delete(delete_args) => delete(delete_args),
     }
 }
 
@@ -231,7 +242,8 @@ impl Hypervisor<'_> {
     }
 }
 
-fn delete(target: &VmTarget) -> Result<()> {
+fn delete(delete_args: &DeleteVmArgs) -> Result<()> {
+    let target = &delete_args.target;
     let hypervisor = Hypervisor {
         ssh_target: &target.hypervisor,
     };
@@ -244,6 +256,10 @@ fn delete(target: &VmTarget) -> Result<()> {
     }
     hypervisor.run(&["rm", "-f", &target.disk_path(), &target.ignition_path()])?;
     println!("removed {vm_name}");
+    cluster::forget_dpu_node(&target.dpu)?;
+    if delete_args.reprovision {
+        cluster::reprovision_dpu(&target.dpu)?;
+    }
     Ok(())
 }
 

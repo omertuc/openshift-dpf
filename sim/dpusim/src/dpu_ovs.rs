@@ -13,7 +13,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
 
+use std::thread;
+use std::time::Duration;
+
 use anyhow::{Context, Result, bail};
+use clap::Args;
 
 use crate::cmd::{CommandExt, command};
 use crate::links::{ensure_bridge, ensure_veth, ip, is_veth, link_exists, link_with_mac};
@@ -76,7 +80,19 @@ impl SimEnv {
     }
 }
 
-pub fn run() -> Result<()> {
+#[derive(Args)]
+pub struct DpuOvsArgs {
+    /// Instead of building the bridges, keep watching for ports DPF adds as
+    /// `type=dpdk` and turn them back into plain (system) ports. See
+    /// `keep_system_ports`.
+    #[arg(long)]
+    keep_system_ports: bool,
+}
+
+pub fn run(dpu_ovs_args: &DpuOvsArgs) -> Result<()> {
+    if dpu_ovs_args.keep_system_ports {
+        return keep_system_ports();
+    }
     let sim_env = SimEnv::load()?;
     let mtu: u32 = sim_env.get_number("MTU", 9000)?;
     let vfs_per_pf: u16 = sim_env.get_number("SIM_NUM_VFS", 7)?;
@@ -281,4 +297,54 @@ fn build_ovs_bridges() -> Result<()> {
         "type=patch",
         "options:peer=pbrovntobrdpu",
     ])
+}
+
+/// How often `keep_system_ports` looks. OVN-K deletes ports without an
+/// ofport once a minute, so this must be well under that.
+const SYSTEM_PORT_CHECK_INTERVAL: Duration = Duration::from_secs(5);
+
+/// DPF's sfc-controller adds the ports it manages (p0, p1, representors) as
+/// `type=dpdk`, as on a BlueField's OVS-DOCA. It keeps an existing port as it
+/// is, so the `type=system` ports `dpu-ovs` creates normally survive; but when
+/// it deletes and re-adds one (as when a DPU of the same name is reprovisioned
+/// and the old node's ServiceInterfaces get finalized), the new port is
+/// `dpdk`, which the kernel datapath cannot open (ofport -1). OVN-K then
+/// deletes it as stale, the sfc-controller re-adds it as `dpdk`, and so on.
+/// This loop breaks that cycle: any `dpdk` interface named after a netdev of
+/// this machine becomes a system port.
+fn keep_system_ports() -> Result<()> {
+    loop {
+        if let Err(error) = fix_dpdk_ports() {
+            eprintln!("warning: {error:#}");
+        }
+        thread::sleep(SYSTEM_PORT_CHECK_INTERVAL);
+    }
+}
+
+fn fix_dpdk_ports() -> Result<()> {
+    let names = command(
+        "ovs-vsctl",
+        [
+            "--timeout",
+            "15",
+            "--bare",
+            "--columns=name",
+            "find",
+            "Interface",
+            "type=dpdk",
+        ],
+    )
+    .read()?;
+    names
+        .split_whitespace()
+        .filter_map(|name| match link_exists(name) {
+            Ok(true) => Some(Ok(name)),
+            Ok(false) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .try_for_each(|name| {
+            let name = name?;
+            println!("{name}: type=dpdk -> type=system");
+            ovs_vsctl(["set", "Interface", name, "type=system"])
+        })
 }

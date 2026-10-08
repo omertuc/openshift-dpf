@@ -10,8 +10,10 @@
 //! and the rebase onto the BlueField OCP image) runs as on a real DPU.
 //!
 //! It also stands in for what the masked units and the BlueField itself set up:
-//! - `dpf-ovs-sim.service` runs `dpusim dpu-ovs`, which builds DPF's OVS bridges;
-//!   the aarch64 dpusim binary goes into the ignition for it
+//! - `dpf-ovs-sim.service` runs `dpusim dpu-ovs`, which builds DPF's OVS bridges,
+//!   and `dpf-ovs-sim-system-ports.service` keeps DPF from turning its ports
+//!   into `dpdk` ones (`dpu-ovs --keep-system-ports`);
+//!   the aarch64 dpusim binary goes into the ignition for both
 //! - with a management NIC, the machine's NIC with that MAC becomes pf0vf0, the
 //!   port of the br-comm-ch management bridge (on a BlueField, the
 //!   representor of the host VF the hostagent bridges into the host network);
@@ -80,6 +82,21 @@ ConditionPathExists=/usr/bin/ovs-vsctl
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/dpusim dpu-ovs
+
+[Install]
+WantedBy=multi-user.target
+";
+
+const OVS_SIM_SYSTEM_PORTS_UNIT: &str = "[Unit]
+Description=Keep DPF's OVS ports plain (system) ports (simulation)
+After=dpf-ovs-sim.service
+Requires=openvswitch.service
+ConditionPathExists=/usr/bin/ovs-vsctl
+
+[Service]
+ExecStart=/usr/local/bin/dpusim dpu-ovs --keep-system-ports
+Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
@@ -325,6 +342,11 @@ fn mask_hardware_units(target: &mut Value) -> Result<usize> {
         })
         .collect();
     units.push(json!({"name": "dpf-ovs-sim.service", "enabled": true, "contents": OVS_SIM_UNIT}));
+    units.push(json!({
+        "name": "dpf-ovs-sim-system-ports.service",
+        "enabled": true,
+        "contents": OVS_SIM_SYSTEM_PORTS_UNIT,
+    }));
     let missing_units: Vec<&str> = HARDWARE_UNITS
         .into_iter()
         .filter(|unit| !masked_units.iter().any(|masked| masked == unit))

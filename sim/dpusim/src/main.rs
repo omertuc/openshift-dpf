@@ -43,7 +43,7 @@ enum DpusimCommand {
     /// Turn a DPU's bf.cfg file into the ignition that boots a machine as it.
     BfcfgToIgnition(ignition::BfcfgToIgnitionArgs),
     /// DPU: build DPF's OVS bridges and the simulated representors.
-    DpuOvs,
+    DpuOvs(dpu_ovs::DpuOvsArgs),
     /// Host VM: make the patched-QEMU igb pair look like a BlueField-3 (M2b).
     Bf3Host(bf3_host::Bf3HostArgs),
     /// Hypervisor: print a host VM's domain XML switched to the patched QEMU (M2b).
@@ -62,7 +62,7 @@ fn main() -> Result<()> {
         DpusimCommand::BfcfgToIgnition(convert_args) => {
             ignition::run_bfcfg_to_ignition(&convert_args)
         }
-        DpusimCommand::DpuOvs => dpu_ovs::run(),
+        DpusimCommand::DpuOvs(dpu_ovs_args) => dpu_ovs::run(&dpu_ovs_args),
         DpusimCommand::Bf3Host(host_args) => bf3_host::run(&host_args),
         DpusimCommand::M2bSwitchVm(switch_args) => m2b::run(&switch_args),
         DpusimCommand::Image(image_command) => images::run(&image_command),
