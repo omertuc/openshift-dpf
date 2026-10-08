@@ -1,0 +1,12 @@
+# DPF's sfc-controller with a configurable port type (sim-port-type.patch),
+# layered on the deployed v26.4.1 dpf-system image (multi-arch list; built
+# for arm64 DPUs). Build with `dpusim image sfc-controller`.
+#
+# The DPU's OVS runs the kernel datapath, where the ports the controller adds
+# to br-sfc as type=dpdk never get an ofport; DPF_SIM_PORT_TYPE=system makes
+# them system ports. The chart has no way to add env vars, so it is set here
+# and overriding the image is the only change needed.
+FROM nvcr.io/nvidia/doca/dpf-system@sha256:2f023592d81e606de6587640300a99a861cc477f95ac20639d1c37ed8431c18f
+COPY sfc-controller /sfc-controller
+ENV DPF_SIM_PORT_TYPE=system
+LABEL org.opencontainers.image.description="DPF dpf-system v26.4.1 + sfc-controller DPF_SIM_PORT_TYPE=system (openshift-dpf sim/sfc-controller)"

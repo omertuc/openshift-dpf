@@ -1,0 +1,121 @@
+From 73a4d7cf78f835cad0ab8f0e77c8318fa240c144 Mon Sep 17 00:00:00 2001
+From: Omer Tuchfeld <omer@tuchfeld.dev>
+Date: Thu, 8 Oct 2026 14:04:26 +0200
+Subject: [PATCH] sfc-controller: DPF_SIM_PORT_TYPE overrides the port
+ interface type
+
+A simulated DPU without BlueField hardware runs OVS's kernel datapath,
+where the ports the SFC controller adds as type=dpdk never get an ofport.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ .../controllers/port_type_test.go             | 48 +++++++++++++++++++
+ .../serviceinterface_controller.go            | 19 +++++++-
+ 2 files changed, 66 insertions(+), 1 deletion(-)
+ create mode 100644 internal/sfccontroller/controllers/port_type_test.go
+
+diff --git a/internal/sfccontroller/controllers/port_type_test.go b/internal/sfccontroller/controllers/port_type_test.go
+new file mode 100644
+index 00000000..9fbff887
+--- /dev/null
++++ b/internal/sfccontroller/controllers/port_type_test.go
+@@ -0,0 +1,48 @@
++/*
++Copyright 2026 NVIDIA
++
++Licensed under the Apache License, Version 2.0 (the "License");
++you may not use this file except in compliance with the License.
++You may obtain a copy of the License at
++
++    http://www.apache.org/licenses/LICENSE-2.0
++
++Unless required by applicable law or agreed to in writing, software
++distributed under the License is distributed on an "AS IS" BASIS,
++WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++See the License for the specific language governing permissions and
++limitations under the License.
++*/
++
++package controller
++
++import (
++	"context"
++	"testing"
++
++	"github.com/nvidia/doca-platform/pkg/ovsutils"
++
++	"go.uber.org/mock/gomock"
++)
++
++func TestAddPortInterfaceType(t *testing.T) {
++	for _, tc := range []struct {
++		env  string
++		want string
++	}{
++		{env: "", want: InterfaceTypeDPDK},
++		{env: "system", want: "system"},
++	} {
++		t.Setenv(PortInterfaceTypeEnv, tc.env)
++		ctrl := gomock.NewController(t)
++		ovsMock := ovsutils.NewMockAPI(ctrl)
++		ovsMock.EXPECT().AddPort(gomock.Any(), ovsutils.PortConfig{
++			BridgeName: SFCBridge, Name: "p0", InterfaceType: tc.want,
++		}).Return(nil)
++		ovsMock.EXPECT().SetIfaceExternalIDs(gomock.Any(), "p0", gomock.Any()).Return(nil)
++		ovsMock.EXPECT().SetPortExternalIDs(gomock.Any(), "p0", gomock.Any()).Return(nil)
++		if err := AddPort(context.Background(), ovsMock, "p0", nil, nil); err != nil {
++			t.Fatalf("%s=%q: %v", PortInterfaceTypeEnv, tc.env, err)
++		}
++	}
++}
+diff --git a/internal/sfccontroller/controllers/serviceinterface_controller.go b/internal/sfccontroller/controllers/serviceinterface_controller.go
+index e5fcb458..e749edd1 100644
+--- a/internal/sfccontroller/controllers/serviceinterface_controller.go
++++ b/internal/sfccontroller/controllers/serviceinterface_controller.go
+@@ -20,6 +20,7 @@ import (
+ 	"context"
+ 	"fmt"
+ 	"hash/fnv"
++	"os"
+ 	"strconv"
+ 	"strings"
+ 	"time"
+@@ -52,6 +53,13 @@ const (
+ 	InterfaceTypeDPDK          = "dpdk"
+ 	InterfaceTypePatch         = "patch"
+ 
++	// PortInterfaceTypeEnv overrides the OVS interface type of the ports the
++	// SFC controller adds to br-sfc (physical, PF, VF and SF ports), which is
++	// InterfaceTypeDPDK by default. A simulated DPU without BlueField hardware
++	// runs OVS's kernel datapath, where its veths and NICs are "system" ports
++	// and a "dpdk" port never gets an ofport.
++	PortInterfaceTypeEnv = "DPF_SIM_PORT_TYPE"
++
+ 	// Patch port naming formats
+ 	peerPatchNameFormat   = "p_%s_to_%s"      // used when PeerPatchName is specified
+ 	patchPortHashedFormat = "p_%s_to_%s_%08x" // used for auto-generated names with hash
+@@ -100,11 +108,20 @@ type ServiceInterfaceReconciler struct {
+ // +kubebuilder:rbac:groups=svc.dpu.nvidia.com,resources=serviceinterfaces/finalizers,verbs=update
+ // +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list;watch
+ 
++// portInterfaceType is the OVS interface type of the ports AddPort adds:
++// InterfaceTypeDPDK unless PortInterfaceTypeEnv says otherwise.
++func portInterfaceType() string {
++	if interfaceType := os.Getenv(PortInterfaceTypeEnv); interfaceType != "" {
++		return interfaceType
++	}
++	return InterfaceTypeDPDK
++}
++
+ func AddPort(ctx context.Context, ovs ovsutils.API, portName string, ifaceExternalIDs, portExternalIDs map[string]string) error {
+ 	if err := ovs.AddPort(ctx, ovsutils.PortConfig{
+ 		BridgeName:    SFCBridge,
+ 		Name:          portName,
+-		InterfaceType: InterfaceTypeDPDK,
++		InterfaceType: portInterfaceType(),
+ 	}); err != nil {
+ 		return err
+ 	}
+-- 
+2.55.0
+

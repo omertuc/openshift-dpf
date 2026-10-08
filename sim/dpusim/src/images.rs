@@ -29,6 +29,13 @@ const OVN_DPF_UTILS_PATCH: &str = include_str!("../../ovn-dpf-utils/sim-dpu.patc
 const OVN_DPF_UTILS_CONTAINERFILE: &str = include_str!("../../ovn-dpf-utils/Containerfile");
 const OVN_DPF_UTILS_BASE: &str = "v26.4.1-ocp-release-v4.22";
 
+/// DPF's sfc-controller with the port type from DPF_SIM_PORT_TYPE, which the
+/// Containerfile sets to "system" (OVS's kernel datapath on simulated DPUs).
+const SFC_CONTROLLER_PATCH: &str = include_str!("../../sfc-controller/sim-port-type.patch");
+const SFC_CONTROLLER_CONTAINERFILE: &str = include_str!("../../sfc-controller/Containerfile");
+/// The deployed DPF version the sfc-controller patch applies to.
+const SFC_CONTROLLER_BASE: &str = "v26.4.1";
+
 const OVNK_CONTAINERFILE: &str = include_str!("../../ovnk/Containerfile");
 const OVNK_BINARIES: [&str; 6] = [
     "cmd/ovnkube",
@@ -64,6 +71,14 @@ pub enum ImageCommand {
         #[arg(long, env = "OVNK_DPF_DIR")]
         ovnk_dpf_dir: Option<PathBuf>,
     },
+    /// DPF's sfc-controller adding ports as system ports, for arm64 DPUs.
+    SfcController {
+        #[arg(default_value = "quay.io/otuchfel/sim-dpu:sfc-controller-simport-arm64")]
+        image: String,
+        /// doca-platform checkout. Default: ~/repos/doca-platform.
+        #[arg(long, env = "DOCA_PLATFORM_DIR")]
+        doca_platform_dir: Option<PathBuf>,
+    },
     /// The simulate-dpu OVN-K DPU image (see sim/ovnk/Containerfile).
     Ovnk {
         /// ovn-kubernetes checkout with --simulate-dpu.
@@ -96,6 +111,13 @@ pub fn run(image_command: &ImageCommand) -> Result<()> {
         } => build_ovn_dpf_utils(
             image,
             &home_checkout(ovnk_dpf_dir.as_deref(), "ovn-kubernetes-dpf")?,
+        ),
+        ImageCommand::SfcController {
+            image,
+            doca_platform_dir,
+        } => build_sfc_controller(
+            image,
+            &home_checkout(doca_platform_dir.as_deref(), "doca-platform")?,
         ),
         ImageCommand::Ovnk {
             ovn_kubernetes_dir,
@@ -263,6 +285,29 @@ fn build_ovn_dpf_utils(image: &str, ovnk_dpf: &Path) -> Result<()> {
     write_file(
         &context_dir.path().join("Containerfile"),
         OVN_DPF_UTILS_CONTAINERFILE,
+    )?;
+    build_and_push_arm64(context_dir.path(), image, &[])
+}
+
+fn build_sfc_controller(image: &str, doca_platform: &Path) -> Result<()> {
+    let work_dir = temp_dir()?;
+    let context_dir = temp_dir()?;
+    let worktree = Worktree::add(
+        doca_platform,
+        work_dir.path().join("src"),
+        SFC_CONTROLLER_BASE,
+    )?;
+    worktree.apply_patch(SFC_CONTROLLER_PATCH)?;
+    // The flags DPF's Makefile (binary-sfc-controller) builds it with.
+    go_build_arm64(
+        &worktree.path,
+        &context_dir.path().join("sfc-controller"),
+        &["-buildvcs=false", "-trimpath", "-ldflags=-s -w"],
+        "./cmd/sfc-controller",
+    )?;
+    write_file(
+        &context_dir.path().join("Containerfile"),
+        SFC_CONTROLLER_CONTAINERFILE,
     )?;
     build_and_push_arm64(context_dir.path(), image, &[])
 }
