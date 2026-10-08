@@ -71,6 +71,8 @@ OVS_SIM_UNIT = """[Unit]
 Description=DPF OVS setup without BlueField hardware (simulation)
 After=network.target openvswitch.service
 Requires=openvswitch.service
+# The boot image has no OVS; it comes with the node image MCO rebases onto.
+ConditionPathExists=/usr/bin/ovs-vsctl
 
 [Service]
 Type=oneshot
