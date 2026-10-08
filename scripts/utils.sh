@@ -673,6 +673,26 @@ generate_mac_from_machine_id() {
     echo "$mac"
 }
 
+# MAC of a worker VM's extra NIC (VM_WORKER_EXTRA_NICS). Args: vm_name nic_name
+worker_extra_nic_mac() {
+    generate_mac_from_machine_id "$1-$2"
+}
+
+# Ignition config naming every worker VM's extra NICs in the guest, via
+# systemd .link files matched on MAC. Prints the JSON.
+worker_extra_nics_ignition() {
+    local files="" i nic mac link
+    for i in $(seq 1 "${VM_WORKER_COUNT:-0}"); do
+        for nic in ${VM_WORKER_EXTRA_NICS}; do
+            mac=$(worker_extra_nic_mac "${VM_WORKER_PREFIX}${i}" "$nic")
+            link=$(printf '[Match]\nMACAddress=%s\n\n[Link]\nName=%s\n' "$mac" "$nic")
+            files+="${files:+,}$(jq -cn --arg path "/etc/systemd/network/10-${nic}-${mac//:/}.link" --arg body "$link" \
+                '{path: $path, mode: 420, overwrite: true, contents: {source: ("data:," + ($body | @uri))}}')"
+        done
+    done
+    echo "{\"ignition\":{\"version\":\"3.2.0\"},\"storage\":{\"files\":[${files}]}}"
+}
+
 # If script is executed directly (not sourced), handle commands
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     command=$1

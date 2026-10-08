@@ -859,6 +859,26 @@ function get_infra_env_id() {
     echo "${infra_env_id}"
 }
 
+# Per-host settings for the installed system, applied before installation:
+# the MachineConfigPool to join (VM_WORKER_MCP) and names for the extra NICs
+# (VM_WORKER_EXTRA_NICS). Not done through MachineConfigs, which would change
+# the rendered config of every node in the pool.
+_configure_day2_host() {
+    local host_id="$1"
+    if [ -n "${VM_WORKER_MCP}" ]; then
+        log "INFO" "Host ${host_id}: joining MachineConfigPool ${VM_WORKER_MCP}"
+        aicli update host "${host_id}" -P mcp="${VM_WORKER_MCP}"
+    fi
+    if [ -n "${VM_WORKER_EXTRA_NICS}" ]; then
+        local ign
+        ign=$(mktemp --suffix=.ign)
+        worker_extra_nics_ignition > "${ign}"
+        log "INFO" "Host ${host_id}: naming extra NICs (${VM_WORKER_EXTRA_NICS})"
+        aicli update host "${host_id}" -P ignition_file="${ign}"
+        rm -f "${ign}"
+    fi
+}
+
 function install_day2_hosts() {
     local expected_count="${VM_WORKER_COUNT:-0}"
     if [ "${expected_count}" -eq 0 ]; then
@@ -900,6 +920,7 @@ function install_day2_hosts() {
             | jq -r --arg cid "${cluster_id}" \
               '.[] | select(.cluster_id == $cid and .status == "known") | .id')
         for host_id in ${host_ids}; do
+            _configure_day2_host "${host_id}"
             log "INFO" "Starting installation for host ${host_id}..."
             aicli start host "${host_id}" || true
         done

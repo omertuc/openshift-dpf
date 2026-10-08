@@ -81,9 +81,15 @@ _delete_vms_by_prefix() {
 }
 
 # Create a single VM via virt-install (backgrounded).
-# Args: vm_name ram vcpus disk1 disk2 network_arg
+# Args: vm_name ram vcpus disk1 disk2 network_arg [extra_network_arg...]
 _create_vm() {
     local vm_name="$1" ram="$2" vcpus="$3" disk1="$4" disk2="$5" network_arg="$6"
+    shift 6
+    local extra_networks=()
+    local extra
+    for extra in "$@"; do
+        extra_networks+=(--network "${extra}")
+    done
     log "INFO" "Starting VM creation for $vm_name..."
     # nohup cannot call shell functions — expand lvirt_install inline
     nohup virt-install --connect "${LIBVIRT_URI}" --name "$vm_name" --memory "$ram" \
@@ -92,6 +98,7 @@ _create_vm() {
             --disk path="${DISK_PATH}/${vm_name}-disk1.qcow2",size="${disk1}" \
             --disk path="${DISK_PATH}/${vm_name}-disk2.qcow2",size="${disk2}" \
             --network "${network_arg}" \
+            "${extra_networks[@]}" \
             --graphics=vnc \
             --events on_reboot=restart \
             --cdrom "$ISO_PATH" \
@@ -231,6 +238,10 @@ function create_worker_vms() {
         fi
     fi
 
+    if [ -n "${VM_WORKER_EXTRA_NICS}" ]; then
+        _ensure_isolated_bridge "${VM_WORKER_EXTRA_NIC_BRIDGE}"
+    fi
+
     local created=0
     for i in $(seq 1 "$worker_count"); do
         local vm_name="${VM_WORKER_PREFIX}${i}"
@@ -244,8 +255,12 @@ function create_worker_vms() {
         local mac=$(_resolve_mac "$vm_name" "$mac_index")
         log "INFO" "Creating worker VM: $vm_name with MAC: $mac"
         local network_full_arg="bridge=${BRIDGE_NAME},model=virtio,mac=${mac}"
+        local extra_nic_args=() nic
+        for nic in ${VM_WORKER_EXTRA_NICS}; do
+            extra_nic_args+=("bridge=${VM_WORKER_EXTRA_NIC_BRIDGE},model=${VM_WORKER_EXTRA_NIC_MODEL},mac=$(worker_extra_nic_mac "$vm_name" "$nic")")
+        done
 
-        _create_vm "$vm_name" "$VM_WORKER_RAM" "$VM_WORKER_VCPUS" "$VM_WORKER_DISK_SIZE1" "$VM_WORKER_DISK_SIZE2" "$network_full_arg"
+        _create_vm "$vm_name" "$VM_WORKER_RAM" "$VM_WORKER_VCPUS" "$VM_WORKER_DISK_SIZE1" "$VM_WORKER_DISK_SIZE2" "$network_full_arg" "${extra_nic_args[@]}"
         ((created++)) || true
     done
 
@@ -256,6 +271,18 @@ function create_worker_vms() {
 
     _wait_for_vms_running "$worker_count" "$VM_WORKER_PREFIX"
     log "INFO" "Worker VM creation completed successfully!"
+}
+
+# Bridge with no uplink for worker extra NICs: they must not get DHCP leases on
+# the cluster network. Not persistent across hypervisor reboots.
+_ensure_isolated_bridge() {
+    local bridge="$1"
+    if libvirt_host_cmd ip link show "${bridge}" &>/dev/null; then
+        return 0
+    fi
+    log "INFO" "Creating isolated bridge ${bridge} for worker extra NICs"
+    libvirt_host_cmd ip link add "${bridge}" type bridge
+    libvirt_host_cmd ip link set "${bridge}" mtu "${NODES_MTU}" up
 }
 
 function delete_worker_vms() {
