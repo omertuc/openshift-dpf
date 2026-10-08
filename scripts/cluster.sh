@@ -935,7 +935,7 @@ function install_day2_hosts() {
         local installed_count
         installed_count=$(aicli -o json list hosts 2>/dev/null \
             | jq -r --arg cid "${cluster_id}" \
-              '[.[] | select(.cluster_id == $cid and (.status == "installed" or .status == "added-to-existing-cluster"))] | length') || installed_count=0
+              '[.[] | select(.cluster_id == $cid and .role == "worker" and (.status == "installed" or .status == "added-to-existing-cluster"))] | length') || installed_count=0
         log "INFO" "Day2 hosts installed: ${installed_count}/${expected_count}"
         [ "${installed_count}" -ge "${expected_count}" ]
     }
