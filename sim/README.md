@@ -39,15 +39,18 @@ Wires between the hypervisors. Each host↔DPU pair gets its own VXLAN:
 | worker1 `52-54-00-aa-fb-35` ↔ VM `dpusim-m4-dpu` | `dpusim0` | `vxdpusim` (4247) | `br-dpusim` | `br-dpufab0` (leaf `swp0`) |
 | worker2 `52-54-00-d6-62-89` ↔ VM `dpusim-52-54-00-d6-62-89-mt26sim62371` | `dpusim1` | `vxdpusim1` (4248) | `br-dpusim1` | `br-dpufab1` (leaf `swp1`) |
 
-Create a wire like this; the hv2 side mirrors the aarchv side:
+Create a wire with `sim/fabric/wire.sh` on both hypervisors:
 
 ```bash
-# aarchv
-ip link add br-dpusim1 type bridge && ip link set br-dpusim1 up
-ip link add vxdpusim1 mtu 1450 type vxlan id 4248 local 10.6.135.47 remote 10.6.135.44 dstport 4789
-ip link set vxdpusim1 master br-dpusim1 up
-# hv2: the same, with bridge dpusim1 and local/remote swapped
+sim/fabric/wire.sh up br-dpusim1 4248 10.6.135.47 10.6.135.44   # on aarchv
+sim/fabric/wire.sh up dpusim1 4248 10.6.135.44 10.6.135.47      # on hv2
 ```
+
+The bridges must behave as a wire, not a switch (`ageing_time 0`, so they learn no
+MACs), and the host's two NICs must be isolated from each other
+(`<port isolated='yes'/>`, added by `m2b-switch-vm.py`). Otherwise traffic between two
+pods on the same host is dropped: the DPU sends it back down the same link, and a
+learning bridge then believes the destination is on the DPU side.
 
 **How the wire works.** The DPU VM has three NICs:
 

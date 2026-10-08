@@ -8,6 +8,8 @@ with ARI the guest only finds the functions the ARI next-function chain
 names, which is just function 0 by default.
 Both also get x-vf-loopback=off: a BlueField sends all VF traffic to its
 eswitch (on the DPU), never VF to VF inside the NIC, so neither may igb.
+For the same reason both NICs get <port isolated='yes'/>: on the wire bridge
+(sim/fabric/wire.sh) they may only talk to the DPU, not to each other.
 
 Run on the hypervisor. Prints the new domain XML; define it with virsh.
 
@@ -45,6 +47,8 @@ def main(path, emulator, serial, mac0, mac1):
             a.set("multifunction", "on")
         else:
             a.attrib.pop("multifunction", None)
+        if iface.find("port") is None:
+            ET.SubElement(iface, "port", {"isolated": "yes"})
         # live XML carries runtime-only elements
         for tag in ("target", "alias"):
             for e in iface.findall(tag):
