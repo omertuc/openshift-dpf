@@ -1,0 +1,12 @@
+# OVN-Kubernetes for simulated DPUs (M4): the arm64 DPU image DPF runs on
+# DPUs, with the go-controller binaries from a release that supports
+# --simulate-dpu (4.23+), so ovnkube in dpu mode finds representors by name
+# (rep<pf>-<func>) instead of through BlueField switchdev sysfs.
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG SOURCE_COMMIT=unknown
+LABEL io.openshift.dpf.sim="ovnk-simdpu" \
+      io.openshift.dpf.sim.base="${BASE_IMAGE}" \
+      io.openshift.dpf.sim.source-commit="${SOURCE_COMMIT}"
+COPY bin/ovnkube bin/hybrid-overlay-node bin/ovnkube-identity bin/ovnkube-observ bin/ovnkube-trace /usr/bin/
+COPY bin/ovn-k8s-cni-overlay /usr/libexec/cni/

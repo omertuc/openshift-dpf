@@ -50,6 +50,7 @@ type options struct {
 	hostSelector     labels.Selector
 	agentHost        string
 	hostagentURL     string
+	sfPluginCount    int
 	// firstBootRebootMethod is what the agent asks for after an OS install.
 	firstBootRebootMethod string
 }
@@ -63,6 +64,7 @@ func main() {
 	flag.IntVar(&opts.numSFs, "num-sfs", 64, "nvidia.com/bf_sf advertised by each simulated DPU Node.")
 	flag.DurationVar(&opts.interval, "interval", 10*time.Second, "Reconcile interval.")
 	flag.StringVar(&opts.agentHost, "agent-host", "", "Run as the dpu-agent of this host's DPUs towards a real hostagent instead of the simulator.")
+	flag.IntVar(&opts.sfPluginCount, "sf-device-plugin", 0, "Run as a device plugin advertising this many simulated nvidia.com/bf_sf (on a DPU node) instead of the simulator.")
 	flag.StringVar(&opts.firstBootRebootMethod, "first-boot-reboot-method", "SystemLevelReset", "Reboot the agent asks for on its first startup after an OS install (agent mode): NoAction, SystemLevelReset or PowerCycle.")
 	flag.StringVar(&opts.hostagentURL, "hostagent-url", "http://localhost:11029", "hostagent installation service URL (agent mode).")
 	hostSelector := flag.String("host-selector", "dpf.openshift.io/sim-level in (m1,m2a,m2b)", "Label selector on host Nodes whose DPUs sim-dpu joins; mock-dms must skip the same hosts.")
@@ -86,6 +88,12 @@ func main() {
 	mgmt, err := dynamic.NewForConfig(mgmtCfg)
 	if err != nil {
 		fatal("management cluster client", err)
+	}
+	if opts.sfPluginCount > 0 {
+		if err := runSFPlugin(ctx, "nvidia.com/bf_sf", opts.sfPluginCount); err != nil {
+			fatal("sf device plugin", err)
+		}
+		return
 	}
 	if opts.agentHost != "" {
 		runAgent(ctx, mgmt, opts)

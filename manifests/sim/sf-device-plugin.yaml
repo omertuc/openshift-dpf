@@ -1,0 +1,52 @@
+# Simulated BlueField scalable functions (M5), for the hosted (DPU) cluster:
+# advertises nvidia.com/bf_sf with "sim-sf-N" device IDs on real DPU nodes
+# without SF hardware (simulated kwok DPUs get bf_sf from sim-dpu directly).
+# The patched ovs-cni turns those IDs into OVS internal ports in the pod.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dpf-sim
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sf-device-plugin
+  namespace: dpf-sim
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: sf-device-plugin
+  namespace: dpf-sim
+spec:
+  selector:
+    matchLabels:
+      app: sf-device-plugin
+  template:
+    metadata:
+      labels:
+        app: sf-device-plugin
+    spec:
+      serviceAccountName: sf-device-plugin
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.dpf.nvidia.com/fake
+                operator: DoesNotExist
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: plugin
+        image: <SIM_DPU_IMAGE>
+        args: ["--sf-device-plugin=<SF_COUNT>"]
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: device-plugins
+          mountPath: /var/lib/kubelet/device-plugins
+      volumes:
+      - name: device-plugins
+        hostPath:
+          path: /var/lib/kubelet/device-plugins
