@@ -29,10 +29,12 @@ DPF_OPERATOR_NAMESPACE="${DPF_OPERATOR_NAMESPACE:-dpf-operator-system}"
 SIM_DOCA_PLATFORM_DIR="${SIM_DOCA_PLATFORM_DIR:-${HOME}/repos/doca-platform}"
 SIM_MOCK_DMS_IMAGE="${SIM_MOCK_DMS_IMAGE:-}"
 SIM_DPU_IMAGE="${SIM_DPU_IMAGE:-}"
+SIM_HOSTAGENT_IMAGE="${SIM_HOSTAGENT_IMAGE:-}"
 SIM_NUM_HOSTS="${SIM_NUM_HOSTS:-2}"
 SIM_HOST_PREFIX="${SIM_HOST_PREFIX:-sim-host}"
 SIM_HOST_MCP="${SIM_HOST_MCP:-worker-dpu}"
-# m0: mock-dms creates a kwok DPU Node; m1: sim-dpu joins it from the real ignition
+# m0: mock-dms creates a kwok DPU Node; m1: sim-dpu joins it from the real ignition;
+# m2a: m1 plus the real hostagent against fake hardware instead of mock-dms
 SIM_LEVEL="${SIM_LEVEL:-m0}"
 KWOK_VERSION="${KWOK_VERSION:-v0.8.0}"
 KWOK_RELEASE_URL="https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}"
@@ -105,14 +107,14 @@ deploy_mock_dms() {
         --set controllerManager.manager.image.repository="${SIM_MOCK_DMS_IMAGE%:*}" \
         --set controllerManager.manager.image.tag="${SIM_MOCK_DMS_IMAGE##*:}" \
         --set "certIPAddresses={${cp_ip}}" \
-        --set "extraArgs={--skip-dpu-cluster-node-selector=dpf.openshift.io/sim-level=m1}"
+        --set-json 'extraArgs=["--skip-dpu-cluster-node-selector=dpf.openshift.io/sim-level=m1","--ignore-host-selector=dpf.openshift.io/sim-level in (m2a,m2b)"]'
     # hostNetwork on a single control-plane node: two replicas cannot coexist.
     oc -n "${DPF_OPERATOR_NAMESPACE}" patch deployment mock-dms-controller-manager --type=merge \
         -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'
     oc -n "${DPF_OPERATOR_NAMESPACE}" rollout status deployment/mock-dms-controller-manager --timeout=300s
 
     # Hosts name the mock-dms pod, which changes on every rollout.
-    oc annotate nodes -l dpf.openshift.io/sim-host=true --overwrite \
+    oc annotate nodes -l 'dpf.openshift.io/sim-host=true,dpf.openshift.io/sim-level in (m0,m1)' --overwrite \
         "provisioning.dpu.nvidia.com/override-dms-pod-name=$(get_mock_dms_pod)"
 }
 
@@ -140,11 +142,40 @@ deploy_sim_dpu() {
 }
 
 # -----------------------------------------------------------------------------
+# Real hostagent against fake hardware (M2a)
+# -----------------------------------------------------------------------------
+# Serial numbers must be unique (the DPUDevice is named after it) and 12
+# characters long (the fake VPD encodes that length).
+sim_serial() {
+    printf 'MT26SIM%05d' $(( $(cksum <<< "$1" | cut -d' ' -f1) % 100000 ))
+}
+
+create_sim_hostagent() {
+    local host=$1
+    if [[ -z "${SIM_HOSTAGENT_IMAGE}" || -z "${SIM_DPU_IMAGE}" ]]; then
+        log "ERROR" "SIM_HOSTAGENT_IMAGE and SIM_DPU_IMAGE must be set"
+        return 1
+    fi
+    local mtu bridge
+    mtu=$(oc get dpfoperatorconfig -n "${DPF_OPERATOR_NAMESPACE}" -o jsonpath='{.items[0].spec.networking.controlPlaneMTU}')
+    bridge=$(oc get dpfoperatorconfig -n "${DPF_OPERATOR_NAMESPACE}" -o jsonpath='{.items[0].spec.networking.dpuNodeOOBBridgeName}')
+    sed -e "s|<NAMESPACE>|${DPF_OPERATOR_NAMESPACE}|g" "${MANIFESTS_DIR}/sim/sim-hardware.yaml" | oc apply -f -
+    log "INFO" "Creating hostagent for ${host} (serial $(sim_serial "${host}"))"
+    sed -e "s|<NAMESPACE>|${DPF_OPERATOR_NAMESPACE}|g" \
+        -e "s|<HOST>|${host}|g" \
+        -e "s|<SERIAL>|$(sim_serial "${host}")|g" \
+        -e "s|<MTU>|${mtu:-1500}|g" \
+        -e "s|<OOB_BRIDGE>|${bridge:-br-dpu}|g" \
+        -e "s|<HOSTAGENT_IMAGE>|${SIM_HOSTAGENT_IMAGE}|g" \
+        -e "s|<SIM_DPU_IMAGE>|${SIM_DPU_IMAGE}|g" \
+        "${MANIFESTS_DIR}/sim/hostagent-m2a.yaml" | oc apply -f -
+}
+
+# -----------------------------------------------------------------------------
 # Fake host Nodes
 # -----------------------------------------------------------------------------
 create_sim_hosts() {
-    local mock_dms_pod cp_ip
-    mock_dms_pod=$(get_mock_dms_pod)
+    local dms_pod cp_ip
     cp_ip=$(get_control_plane_ip)
     # No MCD runs on a fake Node, so claim it is already on the pool's rendered
     # config; the maintenance operator needs the node's pool to pause it.
@@ -153,6 +184,12 @@ create_sim_hosts() {
 
     for i in $(seq 0 $((SIM_NUM_HOSTS - 1))); do
         local name="${SIM_HOST_PREFIX}-${i}"
+        if [[ "${SIM_LEVEL}" == m2a ]]; then
+            create_sim_hostagent "${name}"
+            dms_pod="sim-hostagent-${name}"
+        else
+            dms_pod=$(get_mock_dms_pod)
+        fi
         log "INFO" "Creating fake host Node ${name}"
         oc apply -f - <<EOF
 apiVersion: v1
@@ -169,7 +206,7 @@ metadata:
     dpf.openshift.io/sim-level: ${SIM_LEVEL}
   annotations:
     kwok.x-k8s.io/node: fake
-    provisioning.dpu.nvidia.com/override-dms-pod-name: ${mock_dms_pod}
+    provisioning.dpu.nvidia.com/override-dms-pod-name: ${dms_pod}
     machineconfiguration.openshift.io/currentConfig: ${rendered}
     machineconfiguration.openshift.io/desiredConfig: ${rendered}
     machineconfiguration.openshift.io/state: Done
@@ -181,6 +218,7 @@ EOF
 
 delete_sim_hosts() {
     oc delete nodes -l dpf.openshift.io/sim-host=true --ignore-not-found
+    oc delete pods -n "${DPF_OPERATOR_NAMESPACE}" -l app=sim-hostagent --ignore-not-found
 }
 
 deploy_sim() {

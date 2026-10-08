@@ -1,0 +1,156 @@
+# Fake BlueField-3 hardware for the real hostagent (M2a). Everything the
+# hostagent touches outside Kubernetes, per its v26.4.1 code:
+# - setup: a fake PCI tree (mounted over /sys/bus/pci), fake netdevs and the
+#   OOB bridge in the pod's own network namespace, a fake rshim device
+# - bin-*: shims for the tools it runs through `bash -c` (/simbin, first in PATH)
+# - dms-*: shims mounted over /opt/mellanox/doca/services/dms
+# Every shim call is logged to /simlog/hw.log (container hardware-log).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sim-hardware
+  namespace: <NAMESPACE>
+data:
+  setup: |
+    #!/bin/bash
+    # Runs once per pod, privileged. SIM_SERIAL must be 12 characters.
+    set -euo pipefail
+    pci=/fakepci
+    for fn in 0 1; do
+      d=${pci}/devices/0000:4d:00.${fn}
+      mkdir -p "${d}/net/ens1f${fn}np${fn}"
+      echo 0xa2dc > "${d}/device"
+      # VPD-R: large tag 0x90, length 15, keyword SN, length 12, serial; end tag.
+      printf '\x90\x0f\x00SN\x0c%s\x78' "${SIM_SERIAL}" > "${d}/vpd"
+      echo 0 > "${d}/sriov_numvfs"
+      ln -sfn ../../drivers/mlx5_core "${d}/driver"
+    done
+    mkdir -p ${pci}/devices/0000:4d:00.0/virtfn0/net/ens1f0v0
+    mkdir -p ${pci}/drivers/mlx5_core
+    touch ${pci}/drivers/mlx5_core/bind ${pci}/drivers/mlx5_core/unbind
+
+    # The PF and VF netdevs and the OOB bridge, in this pod's network
+    # namespace. MTU = controlPlaneMTU so the hostagent skips netplan apply.
+    for l in ens1f0np0 ens1f1np1 ens1f0v0; do
+      ip link add "${l}" mtu "${SIM_MTU}" type dummy 2>/dev/null || true
+      ip link set "${l}" up
+    done
+    ip link add "${SIM_OOB_BRIDGE}" type bridge 2>/dev/null || true
+    ip link set "${SIM_OOB_BRIDGE}" mtu "${SIM_MTU}" up
+
+    mkdir -p /var/lib/dpf/dms
+    # The pod's default route is on eth0, not on the bridge.
+    touch /var/lib/dpf/dms/hostnetwork-skip-default-route-check
+    touch /dev/rshim0/misc
+    cat /proc/sys/kernel/random/boot_id > /simstate/boot_id
+    echo "$(date -u +%FT%TZ) setup: BF3 ${SIM_SERIAL} at 0000:4d:00, bridge ${SIM_OOB_BRIDGE}" >> /simlog/hw.log
+
+  hostagent: |
+    #!/bin/bash
+    # A reboot is a new boot_id; the reboot shims rewrite /simstate/boot_id.
+    set -euo pipefail
+    mount --bind /simstate/boot_id /proc/sys/kernel/random/boot_id
+    exec /hostagent serve "$@"
+
+  log: |
+    #!/bin/bash
+    # Shared by all shims: /sim/log <tool> <args...>
+    echo "$(date -u +%FT%TZ) $*" >> /simlog/hw.log
+
+  reboot: |
+    #!/bin/bash
+    # The host and DPU come back with a new boot_id.
+    /usr/bin/cat /proc/sys/kernel/random/uuid > /simstate/boot_id
+    echo "$(date -u +%FT%TZ) reboot: new boot_id $(/usr/bin/cat /simstate/boot_id)" >> /simlog/hw.log
+
+  bin-systemctl: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    case "$*" in
+      "is-active systemd-networkd") echo active ;;
+      "is-active NetworkManager") echo inactive; exit 3 ;;
+    esac
+
+  bin-flint: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    cat <<EOF
+    Image type:            FS5
+    FW Version:            32.43.1014
+    FW Release Date:       15.1.2025
+    Part Number:           900-9D3B6-00CV-AA0
+    Description:           NVIDIA BlueField-3 B3220 P-Series FHHL DPU; 200GbE / NDR200 IB; Dual-port QSFP112; PCIe Gen5.0 x16; 16 Arm cores; 32GB on-board DDR; integrated BMC; Crypto Enabled
+    PSID:                  MT_0000000884
+    EOF
+
+  bin-mlxfwreset: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    case " $* " in
+      *" -l 4 "*) /sim/reboot ;;
+    esac
+
+  bin-ipmitool: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    case "$*" in
+      "chassis power cycle"|"chassis power reset") /sim/reboot ;;
+    esac
+
+  bin-cat: |
+    #!/bin/bash
+    # Reading the rshim misc device returns the BlueField's rshim status.
+    for a in "$@"; do
+      case "${a}" in
+        /dev/rshim*/misc)
+          /sim/log cat "${a}"
+          /usr/bin/cat <<EOF
+    DISPLAY_LEVEL   2 (0:basic, 1:advanced, 2:log)
+    BOOT_MODE       1 (0:rshim, 1:emmc, 2:emmc-boot-swap)
+    DEV_NAME        pcie-0000:4d:00.2
+    DEV_INFO        BlueField-3(Rev 1)
+    UP_TIME         120(s)
+    ---------------------------------------
+                 Log Messages
+    ---------------------------------------
+    INFO[UEFI]: UEFI Secure Boot (disabled)
+    EOF
+          exit 0 ;;
+      esac
+    done
+    exec /usr/bin/cat "$@"
+
+  bin-udevadm: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+
+  bin-netplan: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+
+  bin-networkctl: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+
+  dms-dmsc: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    case "$*" in
+      *" get "*) echo '{"nvidia/mode/config/mode": "DPU"}' ;;
+      *" os install "*)
+        # The BFB is not needed after "installing" it; free the space.
+        pkg=$(sed -n 's/.*--pkg \([^ ]*\).*/\1/p' <<< "$*")
+        [[ "${pkg}" == *.bfb ]] && rm -f "${pkg}"
+        ;;
+    esac
+    exit 0
+
+  dms-dms-cli: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    echo '{"/nvidia/mode/operating-mode": "DPU"}'
+
+  dms-dmsd: |
+    #!/bin/bash
+    /sim/log "$(basename "$0")" "$@"
+    exec sleep infinity

@@ -48,6 +48,10 @@ type options struct {
 	numSFs           int
 	interval         time.Duration
 	hostSelector     labels.Selector
+	agentHost        string
+	hostagentURL     string
+	// firstBootRebootMethod is what the agent asks for after an OS install.
+	firstBootRebootMethod string
 }
 
 func main() {
@@ -58,7 +62,10 @@ func main() {
 	flag.StringVar(&opts.nodeIP, "node-ip", os.Getenv("HOST_IP"), "InternalIP reported by the simulated DPU Nodes.")
 	flag.IntVar(&opts.numSFs, "num-sfs", 64, "nvidia.com/bf_sf advertised by each simulated DPU Node.")
 	flag.DurationVar(&opts.interval, "interval", 10*time.Second, "Reconcile interval.")
-	hostSelector := flag.String("host-selector", "dpf.openshift.io/sim-level=m1", "Label selector on host Nodes whose DPUs sim-dpu joins; mock-dms must skip the same hosts.")
+	flag.StringVar(&opts.agentHost, "agent-host", "", "Run as the dpu-agent of this host's DPUs towards a real hostagent instead of the simulator.")
+	flag.StringVar(&opts.firstBootRebootMethod, "first-boot-reboot-method", "SystemLevelReset", "Reboot the agent asks for on its first startup after an OS install (agent mode): NoAction, SystemLevelReset or PowerCycle.")
+	flag.StringVar(&opts.hostagentURL, "hostagent-url", "http://localhost:11029", "hostagent installation service URL (agent mode).")
+	hostSelector := flag.String("host-selector", "dpf.openshift.io/sim-level in (m1,m2a,m2b)", "Label selector on host Nodes whose DPUs sim-dpu joins; mock-dms must skip the same hosts.")
 	flag.Parse()
 	var err error
 	if opts.hostSelector, err = labels.Parse(*hostSelector); err != nil {
@@ -80,6 +87,11 @@ func main() {
 	if err != nil {
 		fatal("management cluster client", err)
 	}
+	if opts.agentHost != "" {
+		runAgent(ctx, mgmt, opts)
+		return
+	}
+
 	var hosted dynamic.Interface
 	var hostedCS kubernetes.Interface
 	if opts.hostedKubeconfig != "" {

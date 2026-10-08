@@ -1,0 +1,130 @@
+# The real DPF hostagent for one simulated host (M2a), against fake BlueField
+# hardware (sim-hardware ConfigMap). Laid out like the hostagent pod DPF
+# creates, but it runs on the control plane in its own network namespace and
+# serves <HOST> through KUBERNETES_NODE_NAME/NODE_NAME; the host's
+# provisioning.dpu.nvidia.com/override-dms-pod-name points at this pod.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sim-hostagent-<HOST>
+  namespace: <NAMESPACE>
+  labels:
+    app: sim-hostagent
+    dpf.openshift.io/sim-host: <HOST>
+spec:
+  serviceAccountName: dpf-provisioning-hostagent-service-account
+  imagePullSecrets:
+  - name: dpf-pull-secret
+  # Never on a simulated (kwok) host, where it would not actually run.
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+  - key: node-role.kubernetes.io/master
+    operator: Exists
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+  initContainers:
+  - name: sim-hardware
+    image: <HOSTAGENT_IMAGE>
+    command: [/sim/setup]
+    env:
+    - {name: SIM_SERIAL, value: "<SERIAL>"}
+    - {name: SIM_MTU, value: "<MTU>"}
+    - {name: SIM_OOB_BRIDGE, value: "<OOB_BRIDGE>"}
+    securityContext:
+      privileged: true
+    volumeMounts: &simMounts
+    - {name: sim, mountPath: /sim}
+    - {name: fakepci, mountPath: /fakepci}
+    - {name: simlog, mountPath: /simlog}
+    - {name: simstate, mountPath: /simstate}
+    - {name: rshim, mountPath: /dev/rshim0}
+    - {name: dpf-local-dir, mountPath: /var/lib/dpf}
+  containers:
+  - name: dms
+    image: <HOSTAGENT_IMAGE>
+    command: [/bin/bash, -c, --]
+    args: ["/hostagent rundms"]
+    env: &hostagentEnv
+    - {name: PATH, value: "/simbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"}
+    - {name: KUBERNETES_NODE_NAME, value: "<HOST>"}
+    - {name: NODE_NAME, value: "<HOST>"}
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    securityContext:
+      privileged: true
+    volumeMounts: &hostagentMounts
+    - {name: sim, mountPath: /sim}
+    - {name: sim-bin, mountPath: /simbin}
+    - {name: sim-dms, mountPath: /opt/mellanox/doca/services/dms}
+    - {name: fakepci, mountPath: /sys/bus/pci}
+    - {name: simlog, mountPath: /simlog}
+    - {name: simstate, mountPath: /simstate}
+    - {name: rshim, mountPath: /dev/rshim0}
+    - {name: dpf-local-dir, mountPath: /var/lib/dpf}
+    - {name: dms-image, mountPath: /tmp/dms}
+    - {name: etc-netplan, mountPath: /etc/netplan}
+    - {name: run-udev, mountPath: /run/udev}
+    - {name: systemd-network, mountPath: /usr/lib/systemd/network}
+  - name: hostagent
+    image: <HOSTAGENT_IMAGE>
+    command: [/sim/hostagent]
+    args: ["--bfb-registry-address=http://bfb-registry:8082"]
+    env: *hostagentEnv
+    securityContext:
+      privileged: true
+    volumeMounts: *hostagentMounts
+  # Plays the dpu-agent of this host's DPUs, which in a real system talks to
+  # the hostagent over tmfifo.
+  - name: dpu-agent
+    image: <SIM_DPU_IMAGE>
+    args: ["--agent-host=<HOST>", "--namespace=<NAMESPACE>"]
+  - name: hardware-log
+    image: <HOSTAGENT_IMAGE>
+    command: [/usr/bin/tail, -n, "+1", -F, /simlog/hw.log]
+    volumeMounts:
+    - {name: simlog, mountPath: /simlog}
+  volumes:
+  - name: sim
+    configMap:
+      name: sim-hardware
+      defaultMode: 0755
+      items:
+      - {key: setup, path: setup}
+      - {key: hostagent, path: hostagent}
+      - {key: log, path: log}
+      - {key: reboot, path: reboot}
+  - name: sim-bin
+    configMap:
+      name: sim-hardware
+      defaultMode: 0755
+      items:
+      - {key: bin-systemctl, path: systemctl}
+      - {key: bin-flint, path: flint}
+      - {key: bin-mlxfwreset, path: mlxfwreset}
+      - {key: bin-ipmitool, path: ipmitool}
+      - {key: bin-cat, path: cat}
+      - {key: bin-udevadm, path: udevadm}
+      - {key: bin-netplan, path: netplan}
+      - {key: bin-networkctl, path: networkctl}
+  - name: sim-dms
+    configMap:
+      name: sim-hardware
+      defaultMode: 0755
+      items:
+      - {key: dms-dmsc, path: dmsc}
+      - {key: dms-dms-cli, path: dms-cli}
+      - {key: dms-dmsd, path: dmsd}
+  - {name: fakepci, emptyDir: {}}
+  - {name: simlog, emptyDir: {}}
+  - {name: simstate, emptyDir: {}}
+  - {name: rshim, emptyDir: {}}
+  - {name: dpf-local-dir, emptyDir: {}}
+  - {name: dms-image, emptyDir: {sizeLimit: 2Gi}}
+  - {name: etc-netplan, emptyDir: {}}
+  - {name: run-udev, emptyDir: {}}
+  - {name: systemd-network, emptyDir: {}}
