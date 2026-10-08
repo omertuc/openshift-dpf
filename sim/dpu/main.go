@@ -150,6 +150,11 @@ func (s *simulator) reconcileJoin(ctx context.Context, dpu *unstructured.Unstruc
 	log := slog.With("dpu", dpu.GetName(), "phase", phase)
 	uid := string(dpu.GetUID())
 	j := s.joins[uid]
+	if j == nil && s.alreadyJoined(ctx, dpu.GetName()) {
+		// A real kubelet keeps its certificates across restarts; so does
+		// this one, by not bootstrapping a Node that already exists.
+		return
+	}
 	if j == nil {
 		bfcfg, _, _ := unstructured.NestedString(dpu.Object, "status", "bfCFGFile")
 		if bfcfg == "" {
@@ -179,6 +184,16 @@ func (s *simulator) reconcileJoin(ctx context.Context, dpu *unstructured.Unstruc
 	if msg != "" {
 		log.Info(msg, "hostname", j.hostname)
 	}
+}
+
+// alreadyJoined reports whether the DPU's Node (named after the DPU) exists in
+// the hosted cluster.
+func (s *simulator) alreadyJoined(ctx context.Context, name string) bool {
+	if s.hostedCS == nil {
+		return false
+	}
+	_, err := s.hostedCS.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+	return err == nil
 }
 
 // hostSelected reports whether the DPU's host Node is one sim-dpu joins.
