@@ -1,0 +1,12 @@
+[Unit]
+Description=Simulated BlueField-3 on the patched-QEMU igb pair (M2b)
+After=systemd-udev-settle.service NetworkManager.service
+Before=kubelet-dependencies.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/bf3sim-host.sh
+
+[Install]
+WantedBy=multi-user.target
