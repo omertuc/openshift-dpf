@@ -20,7 +20,11 @@ It also stands in for what the masked units and the BlueField itself set up:
   and pf0vf0 takes the MTU of the network the machine is on (--mgmt-mtu;
   inside a BlueField it is 9000)
 
-usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] <bf.cfg> <out.ign>
+- with --wire-mac, the NIC with that MAC is the link to the host (M4), a
+  VLAN trunk that dpf-ovs-sim.sh splits into representors; NetworkManager
+  leaves it and the representors alone
+
+usage: dpu-ignition.py [--mgmt-mac MAC [--mgmt-mtu MTU]] [--wire-mac MAC] <bf.cfg> <out.ign>
 """
 import argparse
 import base64
@@ -92,7 +96,7 @@ def add_file(files, path, raw, mode=0o644):
     files.append({"path": path, "mode": mode, "overwrite": True, "contents": {"source": data_url(raw)}})
 
 
-def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500):
+def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500, wire_mac=None):
     with open(bfcfg) as f:
         live = json.load(f)
     target = json.loads(file_contents(live, "/var/target.ign"))
@@ -120,6 +124,11 @@ def main(bfcfg, out, mgmt_mac=None, mgmt_mtu=1500):
         if u["name"] in HARDWARE_UNITS:
             units[i] = {"name": u["name"], "mask": True}
             masked.append(u["name"])
+    if wire_mac:
+        add_file(files, "/etc/dpf/sim.env", f"SIM_WIRE_MAC={wire_mac}\n".encode())
+        add_file(files, "/etc/NetworkManager/conf.d/99-dpf-sim-unmanaged.conf",
+                 ("[keyfile]\nunmanaged-devices=mac:" + wire_mac +
+                  ";interface-name:dpuwire;interface-name:rep*;interface-name:pf0hpf-w\n").encode())
     units.append({"name": "dpf-ovs-sim.service", "enabled": True, "contents": OVS_SIM_UNIT})
     missing = HARDWARE_UNITS - set(masked)
     if missing:
@@ -134,7 +143,8 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser(usage=__doc__)
     p.add_argument("--mgmt-mac")
     p.add_argument("--mgmt-mtu", type=int, default=1500)
+    p.add_argument("--wire-mac")
     p.add_argument("bfcfg")
     p.add_argument("out")
     a = p.parse_args()
-    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu)
+    main(a.bfcfg, a.out, a.mgmt_mac, a.mgmt_mtu, a.wire_mac)

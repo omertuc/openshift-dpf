@@ -36,6 +36,7 @@ SIM_HOST_MCP="${SIM_HOST_MCP:-worker-dpu}"
 # m0: mock-dms creates a kwok DPU Node; m1: sim-dpu joins it from the real ignition;
 # m2a: m1 plus the real hostagent against fake hardware instead of mock-dms
 # m3: m2a host, but a real (aarch64) machine boots the DPU's ignition and joins
+# m4: real host VM (m2b) with a real DPU machine (m3) wired to it
 SIM_LEVEL="${SIM_LEVEL:-m0}"
 KWOK_VERSION="${KWOK_VERSION:-v0.8.0}"
 KWOK_RELEASE_URL="https://github.com/kubernetes-sigs/kwok/releases/download/${KWOK_VERSION}"
@@ -108,7 +109,7 @@ deploy_mock_dms() {
         --set controllerManager.manager.image.repository="${SIM_MOCK_DMS_IMAGE%:*}" \
         --set controllerManager.manager.image.tag="${SIM_MOCK_DMS_IMAGE##*:}" \
         --set "certIPAddresses={${cp_ip}}" \
-        --set-json 'extraArgs=["--skip-dpu-cluster-node-selector=dpf.openshift.io/sim-level=m1","--ignore-host-selector=dpf.openshift.io/sim-level in (m2a,m2b,m3)"]'
+        --set-json 'extraArgs=["--skip-dpu-cluster-node-selector=dpf.openshift.io/sim-level=m1","--ignore-host-selector=dpf.openshift.io/sim-level in (m2a,m2b,m3,m4)"]'
     # hostNetwork on a single control-plane node: two replicas cannot coexist.
     oc -n "${DPF_OPERATOR_NAMESPACE}" patch deployment mock-dms-controller-manager --type=merge \
         -p '{"spec":{"strategy":{"type":"Recreate","rollingUpdate":null}}}'

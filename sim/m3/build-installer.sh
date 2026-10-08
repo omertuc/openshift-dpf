@@ -7,7 +7,8 @@
 # usage: build-installer.sh <dpu-name> <mgmt-mac> [dest-device]
 # env:   KUBECONFIG (management cluster), M3_DIR (live images; default .bin/m3),
 #        BFB_REGISTRY (default http://<control-plane IP>:<bfb-registry NodePort>),
-#        SSH_PUBKEY (added for core; default ~/.ssh/id_ed25519.pub)
+#        SSH_PUBKEY (added for core; default ~/.ssh/id_ed25519.pub),
+#        SIM_WIRE_MAC (NIC linked to the host's PFs, M4)
 # out:   $M3_DIR/<dpu-name>/{kernel,initramfs.img,sha256}
 set -euo pipefail
 
@@ -40,7 +41,8 @@ out="${M3_DIR}/${DPU}"
 mkdir -p "${out}"
 chmod 700 "${out}"
 curl -sSf -m 60 -o "${out}/bf.cfg" "${BFB_REGISTRY}${bfcfg}"
-python3 -I "${HERE}/dpu-ignition.py" --mgmt-mac "${MGMT_MAC}" "${out}/bf.cfg" "${out}/dpu.ign"
+python3 -I "${HERE}/dpu-ignition.py" --mgmt-mac "${MGMT_MAC}" ${SIM_WIRE_MAC:+--wire-mac "${SIM_WIRE_MAC}"} \
+    "${out}/bf.cfg" "${out}/dpu.ign"
 python3 -I - "${out}/dpu.ign" "${SSH_PUBKEY}" <<'EOF'
 import json, sys
 path, keyfile = sys.argv[1:]
