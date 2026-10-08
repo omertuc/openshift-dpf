@@ -120,12 +120,15 @@ make delete-sim-hosts                             # removes all fake hosts
 1. In a `registry.access.redhat.com/ubi9/ubi:9.6` container with the RHEL repos, run
    `rpm -i` on the src.rpm, then
    `dnf builddep --enablerepo=codeready-builder-for-rhel-9-x86_64-rpms qemu-kvm.spec`.
-2. Copy `qemu/igb-vpd.patch` to `SOURCES/` and add `Patch9999: igb-vpd.patch` to the spec.
+2. Copy `qemu/igb-vpd.patch` and `qemu/igb-no-vf-loopback.patch` to `SOURCES/` and add
+   `Patch9999: igb-vpd.patch` and `Patch10000: igb-no-vf-loopback.patch` to the spec.
 3. Run `rpmbuild -bc --define "dist .el9_6" SPECS/qemu-kvm.spec`.
 4. Install `BUILD/qemu-9.1.0/qemu_kvm_build/qemu-system-x86_64` as
    `/usr/libexec/qemu-kvm-bf3sim`, then run `chcon -t qemu_exec_t` on it.
 
-The patch adds the `x-vpd-serial` and `x-pcie-ari-nextfn-1` igb properties.
+The patches add the `x-vpd-serial`, `x-pcie-ari-nextfn-1` and `x-vf-loopback` igb properties.
+`x-vf-loopback=false` stops igb from switching VF-to-VF traffic inside the NIC, so it
+always goes to the DPU, as on a BlueField (otherwise two pods on the same host PF can't talk).
 
 ### M3 / M4: DPU VM on aarchv
 
