@@ -9,9 +9,9 @@
 # frames are the host PF (rep0-0), VLAN 100+N host p0 VF N
 # (rep0-N), VLAN 200+N host p1 VF N (rep1-N). The host tags each VF's traffic
 # (ip link set p0 vf N vlan 100+N), so a VLAN-filtering bridge turns the
-# trunk into one netdev per representor. VF 0 is a BlueField's host<->DPU
-# channel (br-comm-ch); here the machine's own NIC plays it, so representors
-# start at VF 1.
+# trunk into one netdev per representor. p0 VF 0 is a BlueField's host<->DPU
+# channel (br-comm-ch); here the machine's own NIC plays it, so p0's
+# representors start at VF 1 and p1's at VF 0.
 set -euo pipefail
 
 if [[ -r /etc/dpf/sim.env ]]; then
@@ -47,7 +47,7 @@ if [[ -n "${SIM_HOST_PF_MAC:-}" ]]; then
   ip link set pf0hpf address "${SIM_HOST_PF_MAC}"
 fi
 for pf in 0 1; do
-  for vf in $(seq 1 $((SIM_NUM_VFS - 1))); do
+  for vf in $(seq $(( pf == 0 ? 1 : 0 )) $((SIM_NUM_VFS - 1))); do
     veth "rep${pf}-${vf}" "rep${pf}-${vf}w"
   done
 done
@@ -64,7 +64,7 @@ if [[ -n "${SIM_WIRE_MAC:-}" ]]; then
   ip link set "${wire}" up
   ip link set pf0hpf-w master dpuwire
   for pf in 0 1; do
-    for vf in $(seq 1 $((SIM_NUM_VFS - 1))); do
+    for vf in $(seq $(( pf == 0 ? 1 : 0 )) $((SIM_NUM_VFS - 1))); do
       vid=$(( (pf + 1) * 100 + vf ))
       ip link set "rep${pf}-${vf}w" master dpuwire
       bridge vlan del dev "rep${pf}-${vf}w" vid 1 2>/dev/null || true

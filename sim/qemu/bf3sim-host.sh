@@ -26,9 +26,10 @@ for netdev in p0 p1; do
     fi
     # Tag each VF's traffic with its own VLAN so the DPU can tell the VFs
     # apart on the one wire (M4): VF N of p0 -> 100+N, of p1 -> 200+N.
-    # VF 0 is a BlueField's host<->DPU channel and stays untagged.
+    # p0 VF 0 is a BlueField's host<->DPU channel and stays untagged; p1 VF 0
+    # is an ordinary VF (200).
     pf=${netdev#p}
-    for vf in $(seq 1 $((NUM_VFS - 1))); do
+    for vf in $(seq $(( pf == 0 ? 1 : 0 )) $((NUM_VFS - 1))); do
         ip link set "${netdev}" vf "${vf}" vlan $(( (pf + 1) * 100 + vf ))
     done
     echo "${netdev}: ${dev} now reads $(cat "${dev}/device") with $(cat "${dev}/sriov_numvfs") VFs"

@@ -1,0 +1,127 @@
+From 334bf06dcf99ade8d372514822bffe278c47db64 Mon Sep 17 00:00:00 2001
+From: Omer Tuchfeld <omer@tuchfeld.dev>
+Date: Thu, 8 Oct 2026 01:53:09 +0200
+Subject: [PATCH 1/2] test/mock/dms: skip DPU cluster Node creation for
+ selected hosts
+
+Add --skip-dpu-cluster-node-selector so something else (e.g. a simulated
+kubelet that consumes the real install artifact) can join the DPU
+cluster for those hosts, and extraArgs to the chart to pass it.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Signed-off-by: Omer Tuchfeld <omer@tuchfeld.dev>
+---
+ test/mock/dms/chart/templates/deployment.yaml |  3 +++
+ test/mock/dms/chart/values.yaml               |  2 ++
+ test/mock/dms/main.go                         | 13 +++++++++++++
+ test/mock/dms/pkg/controllers/dms_server.go   |  8 ++++++++
+ 4 files changed, 26 insertions(+)
+
+diff --git a/test/mock/dms/chart/templates/deployment.yaml b/test/mock/dms/chart/templates/deployment.yaml
+index d3926f7b..232f9d88 100644
+--- a/test/mock/dms/chart/templates/deployment.yaml
++++ b/test/mock/dms/chart/templates/deployment.yaml
+@@ -35,6 +35,9 @@ spec:
+         - /manager
+         - --config=/etc/config/config.yaml
+         - --host-ip=$(POD_IP)
++        {{- range .Values.extraArgs }}
++        - {{ . | quote }}
++        {{- end }}
+         env:
+         - name: KUBERNETES_CLUSTER_DOMAIN
+           value: {{ quote .Values.kubernetesClusterDomain }}
+diff --git a/test/mock/dms/chart/values.yaml b/test/mock/dms/chart/values.yaml
+index 0845ccfd..bd4e082a 100644
+--- a/test/mock/dms/chart/values.yaml
++++ b/test/mock/dms/chart/values.yaml
+@@ -31,3 +31,5 @@ tolerations:
+     operator: Exists
+     effect: NoSchedule
+ certIPAddresses: []
++# -- extraArgs are appended to the mock-dms command line.
++extraArgs: []
+diff --git a/test/mock/dms/main.go b/test/mock/dms/main.go
+index 7d63fda0..2f4ac355 100644
+--- a/test/mock/dms/main.go
++++ b/test/mock/dms/main.go
+@@ -19,6 +19,7 @@ package main
+ import (
+ 	"crypto/tls"
+ 	"fmt"
++	"k8s.io/apimachinery/pkg/labels"
+ 	"os"
+ 	"time"
+ 
+@@ -70,6 +71,7 @@ func main() {
+ 	var hostIP string
+ 	var certificatePath string
+ 	var configPath string
++	var skipDPUClusterNodeSelector string
+ 
+ 	fs.StringVar(&metricsAddr, "metrics-bind-address", ":35769", "The address the metric endpoint binds to.")
+ 	fs.StringVar(&probeAddr, "health-probe-bind-address", ":35001", "The address the probe endpoint binds to.")
+@@ -83,6 +85,7 @@ func main() {
+ 
+ 	fs.StringVar(&certificatePath, "certificate-path", "/mock-dms-serving-certs/", "The directory containing the server 'tls.cert' cert and 'tls.key' private key.")
+ 	fs.StringVar(&configPath, "config", "/etc/config/config.yaml", "The directory containing the configmap with the configuration for the server")
++	fs.StringVar(&skipDPUClusterNodeSelector, "skip-dpu-cluster-node-selector", "", "Label selector on host Nodes whose DPUs mock-dms does not create a DPU cluster Node for; something else joins them (e.g. a simulated kubelet).")
+ 
+ 	logsv1.AddFlags(logOptions, fs)
+ 
+@@ -152,9 +155,19 @@ func main() {
+ 	}
+ 
+ 	ctx := ctrl.SetupSignalHandler()
++	skipSelector, err := labels.Parse(skipDPUClusterNodeSelector)
++	if err != nil {
++		setupLog.Error(err, "invalid --skip-dpu-cluster-node-selector")
++		os.Exit(1)
++	}
++	if skipDPUClusterNodeSelector == "" {
++		skipSelector = labels.Nothing()
++	}
+ 	if err = (&dpu.DMSServerReconciler{
+ 		Client:  mgr.GetClient(),
+ 		PodName: podName,
++
++		SkipDPUClusterNodeSelector: skipSelector,
+ 	}).SetupWithManager(mgr); err != nil {
+ 		setupLog.Error(err, "unable to create controller")
+ 		os.Exit(1)
+diff --git a/test/mock/dms/pkg/controllers/dms_server.go b/test/mock/dms/pkg/controllers/dms_server.go
+index 7b024513..5209b550 100644
+--- a/test/mock/dms/pkg/controllers/dms_server.go
++++ b/test/mock/dms/pkg/controllers/dms_server.go
+@@ -29,6 +29,7 @@ import (
+ 	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	"k8s.io/apimachinery/pkg/api/resource"
++	"k8s.io/apimachinery/pkg/labels"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/types"
+ 	"k8s.io/utils/ptr"
+@@ -49,6 +50,10 @@ type DMSServerReconciler struct {
+ 
+ 	// PodName is used to advertise this pod as the DMS server for DPUs.
+ 	PodName string
++
++	// SkipDPUClusterNodeSelector selects host Nodes whose DPUs join the DPU
++	// cluster by other means.
++	SkipDPUClusterNodeSelector labels.Selector
+ }
+ 
+ // +kubebuilder:rbac:groups=provisioning.dpu.nvidia.com,resources=dpus;dpunodes;dpudevices,verbs=get;list;watch;create;update;patch;delete
+@@ -103,6 +108,9 @@ func (r *DMSServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
+ 	}
+ 
+ 	// Create a Node for the DPU once it has been created.
++	if r.SkipDPUClusterNodeSelector.Matches(labels.Set(node.GetLabels())) {
++		return ctrl.Result{}, nil
++	}
+ 	if err := r.createNodeForDPU(ctx, dpuNode); err != nil {
+ 		return ctrl.Result{}, err
+ 	}
+-- 
+2.55.0
+

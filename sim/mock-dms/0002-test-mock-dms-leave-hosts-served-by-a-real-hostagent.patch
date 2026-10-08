@@ -1,0 +1,141 @@
+From 6982bdf5bdfc93f94ffb410ef9e2ed0171fd919d Mon Sep 17 00:00:00 2001
+From: Omer Tuchfeld <omer@tuchfeld.dev>
+Date: Thu, 8 Oct 2026 02:32:22 +0200
+Subject: [PATCH 2/2] test/mock/dms: leave hosts served by a real hostagent
+ alone
+
+Add --ignore-host-selector: mock-dms creates no DPUDevice/DPUNode for
+matching hosts and does not fake phase conditions for their DPUs.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Signed-off-by: Omer Tuchfeld <omer@tuchfeld.dev>
+---
+ test/mock/dms/main.go                             | 14 +++++++++++++-
+ test/mock/dms/pkg/controllers/dms_server.go       |  8 +++++++-
+ test/mock/dms/pkg/controllers/hostagent_server.go | 10 ++++++++++
+ 3 files changed, 30 insertions(+), 2 deletions(-)
+
+diff --git a/test/mock/dms/main.go b/test/mock/dms/main.go
+index 2f4ac355..346e7a54 100644
+--- a/test/mock/dms/main.go
++++ b/test/mock/dms/main.go
+@@ -72,6 +72,7 @@ func main() {
+ 	var certificatePath string
+ 	var configPath string
+ 	var skipDPUClusterNodeSelector string
++	var ignoreHostSelector string
+ 
+ 	fs.StringVar(&metricsAddr, "metrics-bind-address", ":35769", "The address the metric endpoint binds to.")
+ 	fs.StringVar(&probeAddr, "health-probe-bind-address", ":35001", "The address the probe endpoint binds to.")
+@@ -85,6 +86,7 @@ func main() {
+ 
+ 	fs.StringVar(&certificatePath, "certificate-path", "/mock-dms-serving-certs/", "The directory containing the server 'tls.cert' cert and 'tls.key' private key.")
+ 	fs.StringVar(&configPath, "config", "/etc/config/config.yaml", "The directory containing the configmap with the configuration for the server")
++	fs.StringVar(&ignoreHostSelector, "ignore-host-selector", "", "Label selector on host Nodes mock-dms leaves alone entirely; a real hostagent serves them.")
+ 	fs.StringVar(&skipDPUClusterNodeSelector, "skip-dpu-cluster-node-selector", "", "Label selector on host Nodes whose DPUs mock-dms does not create a DPU cluster Node for; something else joins them (e.g. a simulated kubelet).")
+ 
+ 	logsv1.AddFlags(logOptions, fs)
+@@ -163,18 +165,28 @@ func main() {
+ 	if skipDPUClusterNodeSelector == "" {
+ 		skipSelector = labels.Nothing()
+ 	}
++	ignoreSelector, err := labels.Parse(ignoreHostSelector)
++	if err != nil {
++		setupLog.Error(err, "invalid --ignore-host-selector")
++		os.Exit(1)
++	}
++	if ignoreHostSelector == "" {
++		ignoreSelector = labels.Nothing()
++	}
+ 	if err = (&dpu.DMSServerReconciler{
+ 		Client:  mgr.GetClient(),
+ 		PodName: podName,
+ 
+ 		SkipDPUClusterNodeSelector: skipSelector,
++		IgnoreHostSelector:         ignoreSelector,
+ 	}).SetupWithManager(mgr); err != nil {
+ 		setupLog.Error(err, "unable to create controller")
+ 		os.Exit(1)
+ 	}
+ 
+ 	if err = (&dpu.HostAgentServerReconciler{
+-		Client: mgr.GetClient(),
++		Client:             mgr.GetClient(),
++		IgnoreHostSelector: ignoreSelector,
+ 	}).SetupWithManager(mgr); err != nil {
+ 		setupLog.Error(err, "unable to create controller")
+ 		os.Exit(1)
+diff --git a/test/mock/dms/pkg/controllers/dms_server.go b/test/mock/dms/pkg/controllers/dms_server.go
+index 5209b550..c2575a3c 100644
+--- a/test/mock/dms/pkg/controllers/dms_server.go
++++ b/test/mock/dms/pkg/controllers/dms_server.go
+@@ -29,8 +29,8 @@ import (
+ 	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	"k8s.io/apimachinery/pkg/api/resource"
+-	"k8s.io/apimachinery/pkg/labels"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/labels"
+ 	"k8s.io/apimachinery/pkg/types"
+ 	"k8s.io/utils/ptr"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+@@ -54,6 +54,9 @@ type DMSServerReconciler struct {
+ 	// SkipDPUClusterNodeSelector selects host Nodes whose DPUs join the DPU
+ 	// cluster by other means.
+ 	SkipDPUClusterNodeSelector labels.Selector
++
++	// IgnoreHostSelector selects host Nodes served by a real hostagent.
++	IgnoreHostSelector labels.Selector
+ }
+ 
+ // +kubebuilder:rbac:groups=provisioning.dpu.nvidia.com,resources=dpus;dpunodes;dpudevices,verbs=get;list;watch;create;update;patch;delete
+@@ -88,6 +91,9 @@ func (r *DMSServerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (
+ 	if !node.DeletionTimestamp.IsZero() {
+ 		return ctrl.Result{}, nil
+ 	}
++	if r.IgnoreHostSelector.Matches(labels.Set(node.GetLabels())) {
++		return ctrl.Result{}, nil
++	}
+ 
+ 	dpuNode := r.dpuNodeForNode(ctx, node)
+ 	if err := r.createDPUDeviceForDPUNode(ctx, dpuNode); err != nil {
+diff --git a/test/mock/dms/pkg/controllers/hostagent_server.go b/test/mock/dms/pkg/controllers/hostagent_server.go
+index 8105adb6..390f62ec 100644
+--- a/test/mock/dms/pkg/controllers/hostagent_server.go
++++ b/test/mock/dms/pkg/controllers/hostagent_server.go
+@@ -22,8 +22,10 @@ import (
+ 	provisioningv1 "github.com/nvidia/doca-platform/api/provisioning/v1alpha1"
+ 	hostutil "github.com/nvidia/doca-platform/internal/provisioning/hostagent/util"
+ 
++	corev1 "k8s.io/api/core/v1"
+ 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
++	"k8s.io/apimachinery/pkg/labels"
+ 	"k8s.io/utils/ptr"
+ 	ctrl "sigs.k8s.io/controller-runtime"
+ 	"sigs.k8s.io/controller-runtime/pkg/client"
+@@ -32,6 +34,9 @@ import (
+ 
+ type HostAgentServerReconciler struct {
+ 	Client client.Client
++
++	// IgnoreHostSelector selects host Nodes served by a real hostagent.
++	IgnoreHostSelector labels.Selector
+ }
+ 
+ // +kubebuilder:rbac:groups=provisioning.dpu.nvidia.com,resources=dpus,verbs=get;list;watch;create;update;patch;delete
+@@ -48,6 +53,11 @@ func (r *HostAgentServerReconciler) Reconcile(ctx context.Context, req ctrl.Requ
+ 		}
+ 		return ctrl.Result{}, err
+ 	}
++	host := &corev1.Node{}
++	if err := r.Client.Get(ctx, client.ObjectKey{Name: dpu.Spec.DPUNodeName}, host); err == nil &&
++		r.IgnoreHostSelector.Matches(labels.Set(host.GetLabels())) {
++		return ctrl.Result{}, nil
++	}
+ 	var newCond string
+ 	switch dpu.Status.Phase {
+ 	case provisioningv1.DPUInitializeInterface:
+-- 
+2.55.0
+
