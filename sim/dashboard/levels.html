@@ -1,0 +1,511 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DPU Simulation Levels</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --text: #1d2330; --muted: #5f6878; --line: #e2e5eb; --chip: #eef1f6;
+    --real: #1f7a4d; --real-bg: #e3f3ea;
+    --partial: #2b6cb0; --partial-bg: #e4eefa;
+    --fake: #b26b00; --fake-bg: #fdf1dc;
+    --na: #9aa3b2; --na-bg: #f1f2f5;
+    --wire: #6b7385; --accent: #2b6cb0;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #9aa3b5; --line: #2a303b; --chip: #232936;
+      --real: #48bb78; --real-bg: #16301f;
+      --partial: #63b3ed; --partial-bg: #172a3d;
+      --fake: #ecb04b; --fake-bg: #33280f;
+      --na: #6b7385; --na-bg: #1f232c;
+      --wire: #8b93a5; --accent: #63b3ed;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12151b; --panel: #1a1e26; --text: #e6e9ef; --muted: #9aa3b5; --line: #2a303b; --chip: #232936;
+    --real: #48bb78; --real-bg: #16301f;
+    --partial: #63b3ed; --partial-bg: #172a3d;
+    --fake: #ecb04b; --fake-bg: #33280f;
+    --na: #6b7385; --na-bg: #1f232c;
+    --wire: #8b93a5; --accent: #63b3ed;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: var(--accent); }
+  header { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent);
+           backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  .bar { max-width: 1480px; margin: 0 auto; padding: 10px 16px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .bar h1 { font-size: 17px; margin: 0; }
+  .bar nav { display: flex; gap: 6px; flex-wrap: wrap; }
+  .bar nav a { text-decoration: none; padding: 3px 9px; border-radius: 999px; background: var(--chip); color: var(--text); font-size: 13px; }
+  .bar nav a:hover { background: var(--line); }
+  .bar .spacer { flex: 1; }
+  main { max-width: 1480px; margin: 0 auto; padding: 8px 16px 48px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; margin: 18px 0; scroll-margin-top: 64px; }
+  h2 { font-size: 22px; margin: 0 0 4px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  h2 .tag { font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  h3 { font-size: 14px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 18px 0 8px; }
+  .lede { color: var(--muted); margin: 2px 0 12px; font-size: 16px; }
+  p { margin: 8px 0; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--chip); padding: 1px 5px; border-radius: 5px; }
+  .pair { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 1400px) { .pair { grid-template-columns: 1fr 1fr; } }
+  .fig.hero { max-width: 980px; margin: 0 auto; }
+  .fig { border: 1px solid var(--line); border-radius: 10px; padding: 8px; background: var(--bg); min-width: 0; }
+  .fig .cap { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); margin: 2px 4px 6px; }
+  .scroll { overflow-x: auto; }
+  svg.dia { display: block; width: 100%; min-width: 520px; height: auto; color: var(--text); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin: 10px 2px 0; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .sw { width: 16px; height: 12px; border-radius: 3px; display: inline-block; border: 1.5px solid; }
+  .sw.real { background: var(--real-bg); border-color: var(--real); }
+  .sw.partial { background: var(--partial-bg); border-color: var(--partial); border-style: dashed; }
+  .sw.fake { border-color: var(--fake); border-style: dashed;
+             background: repeating-linear-gradient(45deg, var(--fake-bg) 0 3px, transparent 3px 6px), var(--fake-bg); }
+  .sw.na { background: var(--na-bg); border-color: var(--na); border-style: dotted; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin: 3px 0; }
+  .proves li::marker { content: "✓  "; color: var(--real); }
+  .misses li::marker { content: "✗  "; color: var(--fake); }
+  table.cmp { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.cmp th, table.cmp td { text-align: left; vertical-align: top; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  table.cmp th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  table.cmp td:first-child { font-weight: 600; white-space: nowrap; }
+  .st { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; white-space: nowrap; }
+  .st.real { color: var(--real); background: var(--real-bg); }
+  .st.partial { color: var(--partial); background: var(--partial-bg); }
+  .st.fake { color: var(--fake); background: var(--fake-bg); }
+  .st.na { color: var(--na); background: var(--na-bg); }
+  .live { margin-left: auto; font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--chip); color: var(--muted); }
+  .live.ok { color: var(--real); background: var(--real-bg); }
+  .live.warn { color: var(--fake); background: var(--fake-bg); }
+  .ladder { border-collapse: separate; border-spacing: 3px; font-size: 13px; width: 100%; min-width: 640px; }
+  .ladder th { font-size: 12px; color: var(--muted); font-weight: 600; padding: 4px 6px; text-align: center; }
+  .ladder th.row { text-align: left; color: var(--text); font-weight: 500; white-space: nowrap; }
+  .ladder td { border-radius: 6px; height: 30px; text-align: center; font-size: 11px; font-weight: 700; letter-spacing: .02em; }
+  .ladder td.real { background: var(--real-bg); color: var(--real); box-shadow: inset 0 0 0 1.5px var(--real); }
+  .ladder td.partial { background: var(--partial-bg); color: var(--partial); box-shadow: inset 0 0 0 1.5px var(--partial); }
+  .ladder td.fake { color: var(--fake); background: repeating-linear-gradient(45deg, var(--fake-bg) 0 4px, transparent 4px 8px), var(--fake-bg); box-shadow: inset 0 0 0 1px var(--fake); }
+  .ladder td.na { background: var(--na-bg); color: var(--na); }
+  .ladder th a { color: inherit; }
+  .callout { border-left: 4px solid var(--accent); background: var(--chip); padding: 10px 14px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+  .steps { counter-reset: s; list-style: none; padding: 0; }
+  .steps li { counter-increment: s; position: relative; padding-left: 34px; margin: 8px 0; }
+  .steps li::before { content: counter(s); position: absolute; left: 0; top: 1px; width: 24px; height: 24px; border-radius: 50%;
+                      background: var(--accent); color: var(--panel); font-size: 13px; font-weight: 700; display: grid; place-items: center; }
+  .themebtn { border: 1px solid var(--line); background: var(--panel); color: var(--text); border-radius: 8px; padding: 3px 9px; cursor: pointer; font-size: 13px; }
+  @media (max-width: 860px) {
+    header { position: static; }
+    section { scroll-margin-top: 8px; }
+    .pair, .cols { grid-template-columns: 1fr; }
+    section { padding: 16px; }
+    h2 { font-size: 19px; }
+    .live { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>DPU Simulation · How it works</h1>
+    <nav id="toc"></nav>
+    <span class="spacer"></span>
+    <a href="/">← Live status</a>
+    <button class="themebtn" id="theme" title="Toggle theme">◐</button>
+  </div>
+</header>
+<main>
+  <section id="overview">
+    <h2>A real DPF-on-OpenShift system</h2>
+    <p class="lede">Every level keeps this same picture. What changes is which boxes are real and which are stand-ins.</p>
+    <div class="fig scroll hero"><div class="cap">Real system: x86 host with a BlueField-3</div><div id="dia-real"></div></div>
+    <div class="legend" id="legend"></div>
+    <div class="cols">
+      <div>
+        <h3>Control plane</h3>
+        <p>The <b>management cluster</b> runs DPF (DPU provisioning, DPUDeployment, DPUServices via ArgoCD) and the
+          <b>DPF HCP provisioner</b>, which creates a HyperShift <b>hosted cluster</b> for the DPUs, renders their
+          ignition (served to each DPU inside its <code>bf.cfg</code>), and approves DPU kubelet CSRs.</p>
+        <p>On every host, DPF runs a <b>hostagent</b> that discovers the BlueField over PCI, installs its OS (BFB),
+          reboots it, and configures host networking. Inside the DPU, the <b>dpu-agent</b> reports back over
+          <b>rshim/tmfifo</b>.</p>
+      </div>
+      <div>
+        <h3>Data plane</h3>
+        <p>The BlueField's <b>eswitch</b> connects host PFs/VFs (over <b>PCIe</b>) to <b>representors</b> on the DPU's
+          Arm OS, where <b>OVS</b> forwards between them, the uplinks <b>p0/p1</b> to the fabric, and services.</p>
+        <p><b>OVN-Kubernetes</b> is split: <code>dpu-host</code> mode on the host (management port VF, gateway on the PF)
+          and <code>dpu</code> mode on the DPU (plugging representors into <code>br-int</code>). <b>HBN</b> routes
+          (FRR/BGP) on the DPU using <b>scalable functions</b> (SFs).</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="ladder">
+    <h2>The level ladder</h2>
+    <p class="lede">Which pieces are real at each level. Levels stack: each one keeps what's below it real and replaces another fake.</p>
+    <div class="scroll"><table class="ladder" id="ladder-table"></table></div>
+    <div class="legend" id="legend2"></div>
+  </section>
+
+  <div id="levels"></div>
+</main>
+
+<script>
+const STATES = {
+  real: "Real",
+  partial: "Real, on simulated hardware",
+  fake: "Stand-in",
+  na: "Not present",
+};
+
+// Components drawn in every diagram. x/y/w/h in a 760x460 viewBox.
+const COMPONENTS = [
+  {id: "dpf", label: "DPF operator", x: 34, y: 58, w: 150, h: 44, region: "mgmt"},
+  {id: "prov", label: "DPF HCP provisioner", x: 194, y: 58, w: 150, h: 44, region: "mgmt"},
+  {id: "join", label: "DPU Nodes · CSRs", x: 416, y: 58, w: 150, h: 44, region: "hcp"},
+  {id: "svc", label: "DPUServices", x: 576, y: 58, w: 150, h: 44, region: "hcp"},
+  {id: "hostnode", label: "Host OS · kubelet", x: 34, y: 232, w: 150, h: 44, region: "host"},
+  {id: "hostagent", label: "hostagent", x: 194, y: 232, w: 150, h: 44, region: "host"},
+  {id: "ovnhost", label: "OVN-K dpu-host", x: 34, y: 288, w: 150, h: 44, region: "host"},
+  {id: "nic", label: "PFs · VFs", x: 194, y: 288, w: 150, h: 44, region: "host"},
+  {id: "dpuos", label: "Arm RHCOS · kubelet", x: 416, y: 232, w: 150, h: 44, region: "dpu"},
+  {id: "dpuagent", label: "dpu-agent", x: 576, y: 232, w: 150, h: 44, region: "dpu"},
+  {id: "ovs", label: "OVS · representors", x: 416, y: 288, w: 150, h: 44, region: "dpu"},
+  {id: "ovndpu", label: "OVN-K dpu", x: 576, y: 288, w: 150, h: 44, region: "dpu"},
+  {id: "sfs", label: "Scalable functions", x: 416, y: 344, w: 150, h: 40, region: "dpu"},
+  {id: "hbn", label: "HBN (FRR · NVUE)", x: 576, y: 344, w: 150, h: 40, region: "dpu"},
+  {id: "fw", label: "BMC · rshim · firmware", x: 416, y: 394, w: 310, h: 30, region: "dpu"},
+];
+const LINKS = [
+  {id: "pcie", label: "PCIe · eswitch", from: [344, 310], to: [416, 310]},
+  {id: "tmfifo", label: "tmfifo", from: [344, 254], to: [416, 254]},
+  {id: "fabric", label: "p0/p1 → fabric", from: [726, 364], to: [752, 364], vertical: false},
+];
+
+// Ladder rows (component, link or concept) in display order.
+const ROWS = [
+  ["dpf", "DPF operator & provisioning controllers"],
+  ["prov", "DPF HCP provisioner (HostedCluster, ignition, CSR approval)"],
+  ["svc", "DPUDeployment → DPUServices (ArgoCD)"],
+  ["hostnode", "Host node (OpenShift worker)"],
+  ["hostagent", "hostagent (discovery, BFB install, reboots)"],
+  ["nic", "Host PFs / VFs (PCI device)"],
+  ["ovnhost", "OVN-K dpu-host"],
+  ["join", "DPU join (ignition, kubelet, CSRs)"],
+  ["dpuos", "DPU Arm OS"],
+  ["dpuagent", "dpu-agent"],
+  ["pcie", "Host ↔ DPU data link (PCIe, eswitch)"],
+  ["ovs", "DPU OVS & representors"],
+  ["ovndpu", "OVN-K dpu mode"],
+  ["sfs", "Scalable functions"],
+  ["hbn", "HBN"],
+  ["tmfifo", "rshim / tmfifo"],
+  ["fw", "BMC, firmware, offload"],
+  ["fabric", "Fabric uplinks"],
+];
+
+const LEVELS = [
+  {
+    key: "M0", level: "m0", title: "Paper DPUs", tag: "control plane only",
+    lede: "Everything DPF and the provisioner do runs for real. The hosts, DPUs and the hardware underneath are paper.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "fake", hostnode: "fake", hostagent: "fake", ovnhost: "fake", nic: "na",
+             dpuos: "fake", dpuagent: "fake", ovs: "fake", ovndpu: "fake", sfs: "fake", hbn: "fake", fw: "na",
+             pcie: "na", tmfifo: "na", fabric: "na"},
+    sub: {hostnode: "kwok Node", hostagent: "mock-dms", dpuos: "kwok Node", join: "kwok-hosted", dpuagent: "mock-dms",
+          ovs: "sim-dpu (sfc stand-in)", sfs: "sim-dpu bf_sf", hbn: "kwok pod", ovndpu: "kwok pod", ovnhost: "kwok pod"},
+    how: [
+      "Fake host <b>Nodes</b> are created in the management cluster and kept Ready by <b>kwok</b>, labeled <code>dpu-enabled</code> and pointed at <b>mock-dms</b> (NVIDIA's doca-platform test mock) instead of a real hostagent.",
+      "mock-dms creates the DPUDevice/DPUNode and writes each provisioning phase's condition on the <code>DPU</code> object, so DPF's <b>real state machine</b> walks Node Effect → OS Installing → Rebooting → DPU Cluster Config → Ready, including real <b>maintenance-operator</b> drains.",
+      "At DPU Cluster Config, mock-dms creates a <b>kwok DPU Node</b> in the hosted cluster; a second kwok (<b>kwok-hosted</b>, running in the management cluster because the hosted cluster has no workers) keeps it Ready and runs its pods.",
+      "<b>sim-dpu</b> supplies what a real DPU node would: the <code>nvidia.com/bf_sf</code> resource, a usable node IP, and Ready ServiceInterfaces/ServiceChains (the sfc-controller's job).",
+    ],
+    rows: [
+      ["Host", "Bare-metal OpenShift worker", "kwok Node object"],
+      ["Hostagent", "Pod on the host driving the BlueField", "mock-dms writes phase conditions"],
+      ["DPU node", "Arm RHCOS kubelet joining via ignition", "kwok Node created directly"],
+      ["DPU services", "Pods on the DPU", "Applied by ArgoCD, faked Running by kwok"],
+    ],
+    proves: ["Provisioner reconcile: HostedCluster, ignition ConfigMap, DPUServiceTemplates", "DPF provisioning state machine and drains", "DPUDeployment → DPUServices rendering and rollout", "Scale: dozens of DPUs on one small cluster"],
+    misses: ["Anything a DPU or hostagent actually does", "Ignition content and CSR approval (never used)", "Data plane"],
+  },
+  {
+    key: "M1", level: "m1", title: "Real join", tag: "ignition + CSR",
+    lede: "The DPU Node is no longer created for us: it joins the way a DPU's kubelet does, from the ignition the provisioner generated.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "fake", hostagent: "fake", ovnhost: "fake", nic: "na",
+             dpuos: "partial", dpuagent: "fake", ovs: "fake", ovndpu: "fake", sfs: "fake", hbn: "fake", fw: "na",
+             pcie: "na", tmfifo: "na", fabric: "na"},
+    sub: {hostnode: "kwok Node", hostagent: "mock-dms", dpuos: "sim-dpu kubelet", dpuagent: "mock-dms",
+          ovs: "sim-dpu (sfc stand-in)", sfs: "sim-dpu bf_sf", hbn: "kwok pod", ovndpu: "kwok pod", ovnhost: "kwok pod"},
+    how: [
+      "<b>sim-dpu</b> downloads the DPU's <code>bf.cfg</code> from <b>bfb-registry</b>, the provisioner's live ignition, and extracts the target ignition: hostname and the <code>node-bootstrapper</code> kubeconfig.",
+      "It TLS-bootstraps like a kubelet: a <b>client CSR</b> with the bootstrap credentials, approved by the <b>provisioner's CSR approver</b> only while the DPU is in DPU Cluster Config, then it registers the Node with its own certificate and gets a <b>serving CSR</b> approved.",
+      "mock-dms skips Node creation for m1 hosts (<code>--skip-dpu-cluster-node-selector</code>); kwok keeps the joined Node alive.",
+    ],
+    rows: [
+      ["DPU identity", "Ignition delivered in bf.cfg", "Same ignition, read by sim-dpu"],
+      ["Kubelet bootstrap", "Kubelet with node-bootstrapper credentials", "sim-dpu replays the CSR flow"],
+      ["CSR approval", "Provisioner's approver", "Provisioner's approver (real)"],
+    ],
+    proves: ["The provisioner's ignition is consumable and its bootstrap credentials work", "CSR approval gating on DPU phase (client and serving)", "Re-joins after restarts don't re-bootstrap"],
+    misses: ["Hostagent behavior", "A real kubelet, OS and services"],
+  },
+  {
+    key: "M2a", level: "m2a", title: "Real hostagent", tag: "fake BlueField",
+    lede: "DPF's own hostagent runs and drives a BlueField that exists only as files, shims and dummy netdevs.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "fake", hostagent: "partial", ovnhost: "fake", nic: "fake",
+             dpuos: "partial", dpuagent: "fake", ovs: "fake", ovndpu: "fake", sfs: "fake", hbn: "fake", fw: "fake",
+             pcie: "na", tmfifo: "fake", fabric: "na"},
+    sub: {hostnode: "kwok Node", hostagent: "hostdriver:v26.4.1", nic: "fake sysfs + dummies", dpuos: "sim-dpu kubelet",
+          dpuagent: "sidecar /update-status", fw: "shims (dmsc, flint, …)", tmfifo: "localhost:11029",
+          ovs: "sim-dpu (sfc stand-in)", sfs: "sim-dpu bf_sf", hbn: "kwok pod", ovndpu: "kwok pod", ovnhost: "kwok pod"},
+    how: [
+      "The real hostagent image (<code>nvcr.io/nvidia/doca/hostdriver:v26.4.1</code>) runs in a pod on the control plane and serves a kwok host via <code>KUBERNETES_NODE_NAME</code>.",
+      "Its world is faked in its own namespaces: a BF3 <b>PCI sysfs tree with a VPD serial</b> mounted over <code>/sys/bus/pci</code>, dummy PF/VF netdevs and the OOB bridge in the pod netns, the rshim <code>misc</code> device via a <code>cat</code> shim, and shims for <code>dmsc</code>, <code>flint</code>, <code>mlxfwreset</code>, <code>ipmitool</code>, <code>systemctl</code>, <code>netplan</code>.",
+      "Reboots swap a bind-mounted <code>boot_id</code>. A <b>sim-dpu agent sidecar</b> POSTs <code>/update-status</code> to the hostagent like the dpu-agent would over tmfifo.",
+    ],
+    rows: [
+      ["Discovery", "PCI 15b3:a2dc + VPD serial", "Same files, fabricated"],
+      ["OS install", "BFB over rshim via DMS", "Real 731 MB BFB download; dmsc shim"],
+      ["Reboot", "mlxfwreset / power cycle", "Shim swaps boot_id"],
+      ["Host network", "VFs on the real PF, OOB bridge", "netlink on dummy links"],
+    ],
+    proves: ["Hostagent discovery, BFB download, install, SystemLevelReset reboot", "Host Network Configuration code paths (netlink)", "dpu-agent ↔ hostagent status protocol"],
+    misses: ["Real host OS, NICs and VFs", "Anything inside the DPU"],
+  },
+  {
+    key: "M2b", level: "m2b", title: "Real host", tag: "x86 VM + emulated BlueField PCI",
+    lede: "The host is a real OpenShift worker VM whose emulated NIC looks like a BlueField-3 to DPF.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "real", hostagent: "partial", ovnhost: "partial", nic: "partial",
+             dpuos: "partial", dpuagent: "fake", ovs: "fake", ovndpu: "fake", sfs: "fake", hbn: "fake", fw: "fake",
+             pcie: "na", tmfifo: "fake", fabric: "na"},
+    sub: {hostnode: "RHCOS VM, worker-dpu", hostagent: "M2a pod", nic: "patched QEMU igb", ovnhost: "waits for its DPU",
+          dpuos: "sim-dpu kubelet", dpuagent: "sidecar", fw: "shims", tmfifo: "localhost",
+          ovs: "sim-dpu (sfc stand-in)", sfs: "sim-dpu bf_sf", hbn: "kwok pod", ovndpu: "kwok pod"},
+    how: [
+      "A real RHCOS x86 VM joins the cluster in the <code>worker-dpu</code> pool, so the real <b>dpu-worker-config</b> MachineConfig applies.",
+      "Its two NICs are a <b>patched QEMU igb</b>: functions .0/.1 of one slot (<code>x-pcie-ari-nextfn-1</code> so the guest finds .1), with a <b>VPD capability</b> (<code>x-vpd-serial</code>) serving \"BlueField-3\" and the DPU serial. The guest igb driver still binds, so PF/VF netdevs and SR-IOV are real.",
+      "A boot unit bind-mounts <code>0xa2dc</code> over the PFs' sysfs <code>device</code> and creates <b>7 real VFs</b>; DPF's SR-IOV device plugin then advertises <code>bf3-p0-vfs-mgmt</code> and <code>ovnkube-node-dpu-host</code> starts.",
+    ],
+    rows: [
+      ["Host", "Bare-metal worker", "RHCOS VM (same MachineConfig)"],
+      ["NIC identity", "BlueField-3 PF, 15b3:a2dc", "igb with VPD + device overlay"],
+      ["VFs", "Up to 127+ per PF", "7 per PF (igb limit)"],
+    ],
+    proves: ["dpu-worker-config MachineConfig on a real node", "DPF host components on real PCI VFs", "OVN-K dpu-host scheduling (mgmt VF resource)"],
+    misses: ["mlx5 driver behavior", "Real DPU (until M4)"],
+  },
+  {
+    key: "M3", level: "m3", title: "Real DPU", tag: "Arm RHCOS from the real ignition",
+    lede: "An Arm machine becomes the DPU: it boots the provisioner's ignition, rebases to the BlueField OCP image and joins with a real kubelet.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "fake", hostagent: "partial", ovnhost: "fake", nic: "fake",
+             dpuos: "real", dpuagent: "fake", ovs: "partial", ovndpu: "partial", sfs: "fake", hbn: "partial", fw: "na",
+             pcie: "na", tmfifo: "fake", fabric: "na"},
+    sub: {hostnode: "kwok Node", hostagent: "M2a pod", nic: "fake sysfs", dpuos: "aarc (Ampere KVM)", dpuagent: "masked; sidecar",
+          ovs: "OVS-DOCA, sim bridges", ovndpu: "runs; no host", sfs: "sim bf_sf", hbn: "runs", tmfifo: "localhost"},
+    how: [
+      "<code>dpu-ignition.py</code> turns the DPU's bf.cfg into the target ignition, <b>masking 11 BlueField hardware units</b> (devlink, SFs, rshim/tmfifo, firmware), adding the hostname, mapping the machine's NIC to <code>pf0vf0</code> in <code>br-comm-ch</code> and fixing its MTU.",
+      "The machine (<b>aarc</b>, a KVM VM on an Ampere host; also emulated aarch64 VMs on the laptop) <b>kexecs</b> a live RHCOS initramfs that runs <b>coreos-installer</b> with that ignition. MCO rebases onto <code>bluefield-ocp</code>, the real kubelet joins via the provisioner's CSR approval.",
+      "DPF's DPU services run for real on OVS-DOCA. SMBIOS <code>board_name=BlueField-3</code> lets HBN's NVUE accept the platform.",
+    ],
+    rows: [
+      ["DPU OS", "BFB on BlueField Arm cores", "Same image on an Arm VM"],
+      ["Install", "rshim/BFB → live ignition → coreos-installer", "kexec → coreos-installer"],
+      ["Services", "OVN-K, HBN, DTS on the DPU", "Same pods, no BlueField devices"],
+    ],
+    proves: ["The provisioner's ignition boots a real DPU OS end to end", "Real kubelet join and CSR approval", "DPU services' behavior without hardware (found IPAM, MTU, platform checks)"],
+    misses: ["Host ↔ DPU data path", "Hardware offload, firmware"],
+  },
+  {
+    key: "M4", level: "m4", title: "Real host + real DPU, wired", tag: "data plane",
+    lede: "The real host VM and the real Arm DPU are paired over a wire that stands in for PCIe and the eswitch.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "real", hostagent: "partial", ovnhost: "real", nic: "partial",
+             dpuos: "real", dpuagent: "fake", ovs: "partial", ovndpu: "partial", sfs: "fake", hbn: "partial", fw: "na",
+             pcie: "partial", tmfifo: "fake", fabric: "na"},
+    sub: {hostnode: "RHCOS VM", hostagent: "M2a pod", nic: "igb, VLAN per VF", ovnhost: "dpu-host, Ready",
+          dpuos: "aarc", dpuagent: "sidecar", ovs: "kernel DP, veth reps", ovndpu: "--simulate-dpu", sfs: "sim bf_sf",
+          hbn: "runs", pcie: "VXLAN · VLAN trunk", tmfifo: "localhost"},
+    how: [
+      "A <b>VXLAN</b> joins the host VM's igb bridge (<code>dpusim0</code> on one hypervisor) to a bridge holding aarc's extra NIC (<code>br-dpusim</code> on the Ampere hypervisor).",
+      "The host PF tags VF N's traffic with VLAN <code>(pf+1)×100+N</code>. On the DPU a <b>VLAN-filtering bridge</b> splits the trunk into representor veths: <code>rep0-0</code> for the host PF, <code>rep0-N</code> for VF N, on OVS's kernel datapath.",
+      "OVN-K on the DPU runs release-4.23 binaries with <code>--simulate-dpu</code> (representors by name; gateway MAC from <code>sha256(hostNode+\"\\0host\")</code>), and DPF's <code>cniprovisioner</code> is patched (<code>DPF_SIM_DPU</code>) for the host PF MAC.",
+      "The host's <code>p0</code> gets its address by <b>DHCP from the DPU's dnsmasq across the wire</b>, and the host node goes Ready with OVN-K dpu-host.",
+    ],
+    rows: [
+      ["Host ↔ DPU", "PCIe + eswitch", "VXLAN + VLAN trunk + veths"],
+      ["Representors", "mlx5 switchdev (pf0vfN)", "veths named rep0-N"],
+      ["Forwarding", "Offloaded to the eswitch", "Kernel OVS on Arm cores"],
+    ],
+    proves: ["OVN-K dpu-host ↔ dpu pairing and annotations", "Host PF addressing from the DPU", "Representor plumbing and gateway path"],
+    misses: ["Offload, performance", "Switchdev metadata paths (simulate mode bypasses them)"],
+  },
+  {
+    key: "M5", level: "m4", title: "HBN with simulated SFs", tag: "routing on the DPU",
+    lede: "NVIDIA's HBN runs on the real Arm DPU with scalable functions replaced by OVS internal ports.",
+    states: {dpf: "real", prov: "real", svc: "real", join: "real", hostnode: "real", hostagent: "partial", ovnhost: "real", nic: "partial",
+             dpuos: "real", dpuagent: "fake", ovs: "partial", ovndpu: "partial", sfs: "partial", hbn: "real", fw: "na",
+             pcie: "partial", tmfifo: "fake", fabric: "fake"},
+    sub: {hostnode: "RHCOS VM", hostagent: "M2a pod", nic: "igb", ovnhost: "dpu-host", dpuos: "aarc", dpuagent: "sidecar",
+          ovs: "br-hbn ↔ br-sfc", ovndpu: "--simulate-dpu", sfs: "OVS internal ports", hbn: "doca_hbn 3.4.0",
+          pcie: "VXLAN · VLAN", fabric: "veths, peers idle", tmfifo: "localhost"},
+    how: [
+      "A small device plugin advertises <code>nvidia.com/bf_sf</code> with IDs <code>sim-sf-N</code> on DPU nodes without SF hardware.",
+      "A patched DPF <b>ovs-cni</b> turns a <code>sim-sf-*</code> device into an <b>OVS internal port moved into the pod</b>: one netdev that is both the SF (<code>p0_if</code>, <code>p1_if</code>, <code>pf2dpu2_if</code> in HBN) and its representor in OVS, with DPF's usual <code>br-hbn ↔ br-sfc</code> patches.",
+      "NVUE applies the DPF-generated startup config; FRR/BGP comes up (AS 65110, unnumbered sessions on p0_if/p1_if, idle until there's a fabric to peer with).",
+    ],
+    rows: [
+      ["SFs", "mlx5 auxiliary devices + representors", "OVS internal ports in the pod"],
+      ["Device plugin", "sriov-dp auxNetDevice (bf_sf)", "sim plugin, sim-sf-N IDs"],
+      ["HBN", "doca_hbn on BlueField", "Same image and config"],
+    ],
+    proves: ["HBN's DPUService, NADs, IPAM and CNI chain", "NVUE startup config generated by DPF", "FRR/BGP configuration"],
+    misses: ["Offloaded forwarding (nl2doca has nothing to program)", "BGP sessions (no fabric peers yet)"],
+  },
+];
+
+function hatch(id) {
+  return `<pattern id="${id}" width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="7" height="7" fill="var(--fake-bg)"/><line x1="0" y1="0" x2="0" y2="7" stroke="var(--fake)" stroke-opacity=".35" stroke-width="3"/></pattern>`;
+}
+
+function region(x, y, w, h, title, sub) {
+  return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="14" fill="none" stroke="var(--line)" stroke-width="2"/>
+    <text x="${x + 14}" y="${y + 22}" font-size="13" font-weight="700" fill="var(--text)">${title}</text>
+    <text x="${x + w - 14}" y="${y + 22}" font-size="11" text-anchor="end" fill="var(--muted)">${sub}</text>`;
+}
+
+function box(c, state, sub, pat) {
+  const stroke = `var(--${state})`;
+  const fill = state === "fake" ? `url(#${pat})` : `var(--${state}-bg)`;
+  const dash = state === "real" ? "" : state === "partial" ? 'stroke-dasharray="6 3"' : state === "fake" ? 'stroke-dasharray="3 3"' : 'stroke-dasharray="1 3"';
+  const op = state === "na" ? ' opacity=".55"' : "";
+  const r = c.id === "fw" ? 8 : 10;
+  const ty = sub ? c.y + c.h / 2 - 3 : c.y + c.h / 2 + 4;
+  return `<g${op}><rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="${r}" fill="${fill}" stroke="${stroke}" stroke-width="1.8" ${dash}/>
+    <text x="${c.x + c.w / 2}" y="${ty}" font-size="12" font-weight="600" text-anchor="middle" fill="var(--text)">${c.label}</text>
+    ${sub ? `<text x="${c.x + c.w / 2}" y="${ty + 15}" font-size="10.5" text-anchor="middle" fill="${stroke}">${sub}</text>` : ""}</g>`;
+}
+
+function link(l, state, sub) {
+  const stroke = `var(--${state})`;
+  const dash = state === "real" ? "" : state === "partial" ? 'stroke-dasharray="7 4"' : state === "fake" ? 'stroke-dasharray="3 4"' : 'stroke-dasharray="1 5"';
+  const op = state === "na" ? ' opacity=".5"' : "";
+  const [x1, y1] = l.from, [x2, y2] = l.to;
+  const mx = (x1 + x2) / 2;
+  if (l.id === "fabric") {
+    return `<g${op}><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y1}" stroke="${stroke}" stroke-width="3" ${dash}/>
+      <line x1="${x2}" y1="${y1}" x2="${x2}" y2="${y1 + 80}" stroke="${stroke}" stroke-width="3" ${dash}/>
+      <text x="${x2 - 4}" y="${y1 + 96}" font-size="10.5" text-anchor="end" fill="${stroke}">${sub || l.label}</text></g>`;
+  }
+  return `<g${op}><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${l.id === "pcie" ? 5 : 2.5}" ${dash} stroke-linecap="round"/>
+    <text x="${mx}" y="${y1 - 7}" font-size="10" text-anchor="middle" fill="${stroke}">${l.label}</text>
+    ${sub && sub !== l.label ? `<text x="${mx}" y="${y1 + 16}" font-size="9.5" text-anchor="middle" fill="${stroke}">${sub}</text>` : ""}</g>`;
+}
+
+let svgSeq = 0;
+function diagram(states, subs) {
+  const pat = `h${svgSeq++}`;
+  const s = id => states[id] || "real";
+  const sub = id => (subs || {})[id] || "";
+  const ctl = (x1, y1, x2, y2) => `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="var(--wire)" stroke-width="1.5" stroke-dasharray="2 4" fill="none" marker-end="url(#a${pat})"/>`;
+  return `<svg class="dia" viewBox="0 0 760 470" role="img" xmlns="http://www.w3.org/2000/svg">
+    <defs>${hatch(pat)}<marker id="a${pat}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--wire)"/></marker></defs>
+    ${region(18, 22, 342, 98, "Management cluster", "OpenShift")}
+    ${region(400, 22, 342, 98, "Hosted DPU cluster", "HyperShift")}
+    ${region(18, 196, 342, 252, "x86 host", "worker-dpu")}
+    ${region(400, 196, 342, 252, "BlueField-3 DPU", "Arm cores")}
+    ${ctl(259, 102, 259, 230)}
+    <text x="266" y="168" font-size="10" fill="var(--muted)">DPUs, bf.cfg</text>
+    ${ctl(344, 80, 414, 80)}
+    <text x="379" y="72" font-size="10" text-anchor="middle" fill="var(--muted)">HostedCluster</text>
+    ${ctl(491, 230, 491, 104)}
+    <text x="498" y="168" font-size="10" fill="var(--muted)">kubelet joins</text>
+    ${ctl(651, 104, 651, 230)}
+    <text x="658" y="168" font-size="10" fill="var(--muted)">pods</text>
+    ${COMPONENTS.map(c => box(c, s(c.id), sub(c.id), pat)).join("")}
+    ${LINKS.map(l => link(l, s(l.id), sub(l.id))).join("")}
+    <text x="34" y="368" font-size="11" fill="var(--muted)">Host pods use VFs; the</text>
+    <text x="34" y="383" font-size="11" fill="var(--muted)">DPU forwards their traffic.</text>
+  </svg>`;
+}
+
+function legend() {
+  return Object.entries(STATES).map(([k, v]) => `<span><i class="sw ${k}"></i>${v}</span>`).join("");
+}
+
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c])); }
+
+const ALL_REAL = Object.fromEntries([...COMPONENTS.map(c => c.id), ...LINKS.map(l => l.id)].map(id => [id, "real"]));
+
+document.getElementById("dia-real").innerHTML = diagram(ALL_REAL, {});
+document.getElementById("legend").innerHTML = legend();
+document.getElementById("legend2").innerHTML = legend();
+document.getElementById("toc").innerHTML = `<a href="#overview">Overview</a><a href="#ladder">Ladder</a>` +
+  LEVELS.map(l => `<a href="#${l.key}">${l.key}</a>`).join("");
+
+const SHORT = {real: "REAL", partial: "SIM HW", fake: "FAKE", na: "—"};
+document.getElementById("ladder-table").innerHTML =
+  `<tr><th></th>${LEVELS.map(l => `<th><a href="#${l.key}">${l.key}</a></th>`).join("")}</tr>` +
+  ROWS.map(([id, name]) => `<tr><th class="row">${name}</th>${LEVELS.map(l => {
+    const st = l.states[id] || "real";
+    return `<td class="${st}" title="${esc(l.key + ": " + STATES[st] + (l.sub[id] ? " (" + l.sub[id] + ")" : ""))}">${SHORT[st]}</td>`;
+  }).join("")}</tr>`).join("");
+
+document.getElementById("levels").innerHTML = LEVELS.map(l => `
+  <section id="${l.key}">
+    <h2>${l.key} · ${l.title} <span class="tag">${l.tag}</span><span class="live" id="live-${l.key}">…</span></h2>
+    <p class="lede">${l.lede}</p>
+    <div class="pair">
+      <div class="fig scroll"><div class="cap">Real system</div>${diagram(ALL_REAL, {})}</div>
+      <div class="fig scroll"><div class="cap">${l.key}</div>${diagram(l.states, l.sub)}</div>
+    </div>
+    <div class="legend">${legend()}</div>
+    <h3>How it works</h3>
+    <ol class="steps">${l.how.map(h => `<li>${h}</li>`).join("")}</ol>
+    <h3>Real vs simulated</h3>
+    <div class="scroll"><table class="cmp"><tr><th></th><th>Real system</th><th>${l.key}</th></tr>
+      ${l.rows.map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td></tr>`).join("")}</table></div>
+    <div class="cols">
+      <div><h3>What it proves</h3><ul class="proves">${l.proves.map(p => `<li>${p}</li>`).join("")}</ul></div>
+      <div><h3>What it can't catch</h3><ul class="misses">${l.misses.map(p => `<li>${p}</li>`).join("")}</ul></div>
+    </div>
+  </section>`).join("");
+
+async function live() {
+  try {
+    const s = await (await fetch("/status.json", {cache: "no-store"})).json();
+    for (const l of LEVELS) {
+      const el = document.getElementById(`live-${l.key}`);
+      let total, ready, what = "DPUs";
+      if (l.key === "M5") {
+        const real = s.nodes.filter(n => n.kind === "real");
+        total = real.length; ready = real.filter(n => n.ready === "True").length; what = "real DPU nodes";
+      } else {
+        const ds = s.dpus.filter(d => d.level === l.level);
+        total = ds.length; ready = ds.filter(d => d.phase === "Ready").length;
+      }
+      el.textContent = total ? `live: ${ready}/${total} ${what} Ready` : `live: no ${what} at this level now`;
+      el.className = "live " + (total && ready === total ? "ok" : total ? "warn" : "");
+    }
+  } catch (e) {
+    for (const l of LEVELS) document.getElementById(`live-${l.key}`).textContent = "live: dashboard offline";
+  }
+}
+live();
+setInterval(live, 5000);
+
+const root = document.documentElement;
+try { const t = localStorage.getItem("sim-theme"); if (t) root.dataset.theme = t; } catch (e) {}
+document.getElementById("theme").onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  try { localStorage.setItem("sim-theme", root.dataset.theme); } catch (e) {}
+};
+</script>
+</body>
+</html>
