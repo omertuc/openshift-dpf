@@ -21,17 +21,26 @@ pub fn delete_link_if_present(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// Creates the veth pair `name`/`peer` with `mtu` unless `name` exists, and
-/// brings both ends up.
+/// Creates the veth pair `name`/`peer` with `mtu` unless either end exists,
+/// and brings up the ends that exist. Safe to re-run (systemd re-runs
+/// `dpu-ovs` when openvswitch restarts) after OVN-K renamed an end: it turns
+/// the representor of its management port, `rep0-1`, into `ovn-k8s-mp0`.
 pub fn ensure_veth(name: &str, peer: &str, mtu: u32) -> Result<()> {
-    if !link_exists(name)? {
+    let name_exists = link_exists(name)?;
+    let peer_exists = link_exists(peer)?;
+    if !name_exists && !peer_exists {
         let mtu = mtu.to_string();
         ip([
             "link", "add", name, "mtu", &mtu, "type", "veth", "peer", "name", peer, "mtu", &mtu,
         ])?;
     }
-    ip(["link", "set", name, "up"])?;
-    ip(["link", "set", peer, "up"])
+    [name, peer].into_iter().try_for_each(|end| {
+        if link_exists(end)? {
+            ip(["link", "set", end, "up"])
+        } else {
+            Ok(())
+        }
+    })
 }
 
 /// Creates the bridge `name` unless it exists, with generic `ip link add`
