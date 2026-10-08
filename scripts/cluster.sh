@@ -892,11 +892,14 @@ function install_day2_hosts() {
 
     # Wait for hosts to register via InfraEnv
     log "INFO" "Waiting for ${expected_count} day2 host(s) to register..."
+    # Hosts added by an earlier run count too: VM_WORKER_COUNT is the total.
     _check_hosts_registered() {
         local count
         count=$(aicli -o json list hosts 2>/dev/null \
             | jq -r --arg ieid "${infra_env_id}" \
-              '[.[] | select(.infra_env_id == $ieid and .status == "known")] | length') || count=0
+              '[.[] | select(.infra_env_id == $ieid and .role != "master"
+                  and (.status == "known" or (.status | startswith("installing"))
+                       or .status == "installed" or .status == "added-to-existing-cluster"))] | length') || count=0
         log "INFO" "Day2 hosts registered: ${count}/${expected_count}"
         [ "${count}" -ge "${expected_count}" ]
     }
@@ -933,9 +936,10 @@ function install_day2_hosts() {
     _check_hosts_installed() {
         _bind_and_start_hosts
         local installed_count
+        # Added hosts drop their cluster_id, so count by InfraEnv.
         installed_count=$(aicli -o json list hosts 2>/dev/null \
-            | jq -r --arg cid "${cluster_id}" \
-              '[.[] | select(.cluster_id == $cid and .role == "worker" and (.status == "installed" or .status == "added-to-existing-cluster"))] | length') || installed_count=0
+            | jq -r --arg ieid "${infra_env_id}" \
+              '[.[] | select(.infra_env_id == $ieid and .role == "worker" and (.status == "installed" or .status == "added-to-existing-cluster"))] | length') || installed_count=0
         log "INFO" "Day2 hosts installed: ${installed_count}/${expected_count}"
         [ "${installed_count}" -ge "${expected_count}" ]
     }
