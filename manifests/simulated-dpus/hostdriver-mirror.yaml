@@ -1,0 +1,12 @@
+# Simulated DPUs (SIMULATED_DPUS_ONLY): DPF's DMS pods run the simulated hostdriver, with the same
+# tags. Never the real one: it can't work without a BlueField.
+apiVersion: config.openshift.io/v1
+kind: ImageTagMirrorSet
+metadata:
+  name: simulated-dpu-hostdriver
+spec:
+  imageTagMirrors:
+  - source: nvcr.io/nvidia/doca/hostdriver
+    mirrors:
+    - <SIMULATED_DPU_HOSTDRIVER_IMAGE_REPO>
+    mirrorSourcePolicy: NeverContactSource

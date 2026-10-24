@@ -1,0 +1,6 @@
+# Simulated DPUs: the DPU host VM's link to its DPU's agent has the MAC of a BlueField host's rshim
+# tmfifo interface, and its name.
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:1a:ca:ff:ff:02", NAME="tmfifo_net0"
+# OVN-Kubernetes (DPU host mode) renames a host VF to ovn-k8s-mp0, its management port, and expects
+# it up; with the simulated BlueField's VFs it stays down, cutting the host off from its pods.
+SUBSYSTEM=="net", ACTION=="move", KERNEL=="ovn-k8s-mp0", RUN+="/usr/sbin/ip link set ovn-k8s-mp0 up"

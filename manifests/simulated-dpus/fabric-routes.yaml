@@ -1,0 +1,76 @@
+# Simulated DPUs: every node routes the DPUs' VTEP subnet through the cluster's leaf router, the
+# simulated top-of-rack switch the DPUs' HBN peers with (dpusimaas GET /v1/fabric). On real
+# hardware the network does that. The leaf's address comes from the lab's DHCP server, so it's
+# looked up again every 30 seconds.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dpusim
+  labels:
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+    pod-security.kubernetes.io/audit: privileged
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fabric-routes
+  namespace: dpusim
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fabric-routes-privileged
+  namespace: dpusim
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:openshift:scc:privileged
+subjects:
+- kind: ServiceAccount
+  name: fabric-routes
+  namespace: dpusim
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fabric-routes
+  namespace: dpusim
+spec:
+  selector:
+    matchLabels:
+      app: fabric-routes
+  template:
+    metadata:
+      labels:
+        app: fabric-routes
+    spec:
+      serviceAccountName: fabric-routes
+      hostNetwork: true
+      priorityClassName: system-node-critical
+      tolerations:
+      - operator: Exists
+      containers:
+      - name: routes
+        image: registry.access.redhat.com/ubi9/ubi:latest
+        securityContext:
+          privileged: true
+        env:
+        - name: FABRIC_URL
+          value: <DPUSIMAAS_URL>/v1/fabric?cluster=<SIMULATED_DPU_CLUSTER>
+        - name: VTEP_CIDR
+          value: <VTEP_CIDR>
+        command:
+        - /bin/bash
+        - -c
+        - |
+          while true; do
+            gateway=$(curl -sf --max-time 10 "$FABRIC_URL" | sed -n 's/.*"gateway": *"\([0-9.]*\)".*/\1/p')
+            if [ -n "$gateway" ]; then
+              ip route replace "$VTEP_CIDR" via "$gateway" || true
+            fi
+            sleep 30
+          done
+        resources:
+          requests: {cpu: 5m, memory: 16Mi}
