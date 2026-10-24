@@ -1,0 +1,14 @@
+#!/bin/bash
+# dpusim: the SFs DPF asks for (PF_TOTAL_SF), listed as created; they have no netdevs
+case " $* " in
+*" show "*)
+    n=${DPUSIM_SFS:-20}
+    printf '{'
+    for i in $(seq 0 $((n - 1))); do
+        [ "$i" -gt 0 ] && printf ','
+        printf '"pci/0000:03:00.0/%d":{"sf_netdev":"en3f0pf0sf%d","aux_dev":"mlx5_core.sf.%d","device":"0000:03:00.0","sfnum":%d}' $((229408 + i)) $i $((i + 2)) $i
+    done
+    printf '}\n'
+    exit 0;;
+esac
+echo "dpusim: mlnx-sf $* (simulated)"

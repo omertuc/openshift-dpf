@@ -438,6 +438,11 @@ function update_hbn_ovn_manifests() {
             "<HOST_CLUSTER_API>" "${HOST_CLUSTER_API}" \
             "<DPU_HOST_CIDR>" "${DPU_HOST_CIDR}" \
             "<NODES_MTU>" "${ovn_mtu}"
+        if [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
+            # The simulated DPUs' OVN chart: --simulate-dpu, and the host PF MAC from the node name.
+            sed -i 's|^\(\( *\)dpuManifests:\)$|\1\n\2  simulateDPU: true|' \
+                "${GENERATED_POST_INSTALL_DIR}/ovn-configuration.yaml"
+        fi
     fi
 
     # Update hbn-configuration.yaml
@@ -480,11 +485,18 @@ function generate_dpuservicetemplate_overrides() {
     local major_minor
     major_minor=$(echo "${DPF_VERSION#v}" | cut -d. -f1-2)
 
+    # Simulated DPUs need their OVN chart (dpuManifests.simulateDPU).
+    local ovn_chart_url="${OVN_CHART_URL:-}" ovn_chart_version="${OVN_CHART_VERSION:-}"
+    if [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
+        ovn_chart_url="${SIMULATED_DPU_OVN_CHART_URL}"
+        ovn_chart_version="${SIMULATED_DPU_OVN_CHART_VERSION}"
+    fi
+
     local overrides
     overrides=$(jq -n -f "$(dirname "${BASH_SOURCE[0]}")/dpuservicetemplate-overrides.jq" \
         --arg major_minor "${major_minor}" \
-        --arg ovn_chart_url "${OVN_CHART_URL:-}" \
-        --arg ovn_chart_version "${OVN_CHART_VERSION:-}" \
+        --arg ovn_chart_url "${ovn_chart_url}" \
+        --arg ovn_chart_version "${ovn_chart_version}" \
         --arg hbn_helm_repo_url "${HBN_HELM_REPO_URL:-}" \
         --arg hbn_helm_chart_version "${HBN_HELM_CHART_VERSION:-}" \
         --arg hbn_image_repo "${HBN_IMAGE_REPO:-}" \
@@ -578,6 +590,10 @@ function update_nodesriov_device_plugin_config() {
         "<PF0_REGULAR_VF_START>" "${pf0_regular_start}" \
         "<NUM_VFS_END>" "${vf_range_end}" \
         "<KATA_SRIOV_POOL>" "${kata_sriov_pool}"
+    if [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
+        # Simulated BlueField VFs (igb) have no RDMA.
+        sed -i '/^      options:$/{N;/\n        isRdma: true$/d}' "${dst_dp_config}"
+    fi
 }
 
 # Function to prepare post-installation manifests
@@ -599,7 +615,8 @@ function prepare_post_installation() {
     update_vf_configuration
     update_ipam_controller
     update_dpu_service_nad
-    if [ "${GENERATE_DPUSERVICETEMPLATE_OVERRIDES}" = "true" ]; then
+    # Simulated DPUs need their OVN chart.
+    if [ "${GENERATE_DPUSERVICETEMPLATE_OVERRIDES}" = "true" ] || [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
         generate_dpuservicetemplate_overrides
     else
         log [INFO] "Skipping DPUServiceTemplate overrides (GENERATE_DPUSERVICETEMPLATE_OVERRIDES=${GENERATE_DPUSERVICETEMPLATE_OVERRIDES:-false})"

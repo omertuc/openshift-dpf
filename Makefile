@@ -427,6 +427,10 @@ tft-show-config:
 tft-results:
 	@$(TFT_SCRIPT) show-results
 
+.PHONY: apply-simulated-dpus
+apply-simulated-dpus:
+	@$(WORKER_SCRIPT) apply-simulated-dpus
+
 .PHONY: add-worker-nodes
 add-worker-nodes:
 	@echo "================================================================================"
@@ -711,6 +715,12 @@ help:
 	@echo "  WORKER_n_ROOT_DEVICE  - Target installation disk (e.g., /dev/sda)"
 	@echo "  WORKER_n_DPU          - Set to 'false' for regular workers, defualt is true (worker-dpu)"
 	@echo "  WORKER_NODE_LABELS    - Comma-separated labels for kubelet --node-labels (e.g., node.openshift.io/dpu-host=true)"
+	@echo ""
+	@echo "Simulated DPUs Configuration:"
+	@echo "  SIMULATED_DPUS_ONLY   - Every DPU host is a simulated one from dpusimaas (default: false)"
+	@echo "  DPUSIMAAS_URL         - The dpusimaas the simulated DPU hosts come from (with SIMULATED_DPUS_ONLY)"
+	@echo "  SIMULATED_DPU_OVS_CNI_IMAGE - ovs-cni with simulated SFs, for the simulated DPUs' services"
+	@echo "  make apply-simulated-dpus applies the simulated hosts' MachineConfig and hostdriver mirror"
 	@echo ""
 	@echo "CSR Auto-Approval Configuration:"
 	@echo "  AUTO_APPROVE_WORKER_CSR     - Deploy CronJob to auto-approve CSRs for host cluster workers (default: false)"

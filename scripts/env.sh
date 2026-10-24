@@ -142,6 +142,24 @@ validate_argus_config() {
     fi
 }
 
+# Simulated DPUs: the hosts reach dpusimaas, which boots each DPU VM when DPF installs it.
+validate_simulated_dpus() {
+    if [ "${SIMULATED_DPUS_ONLY}" != "true" ] && [ "${SIMULATED_DPUS_ONLY}" != "false" ]; then
+        echo "Error: SIMULATED_DPUS_ONLY must be true or false (got '${SIMULATED_DPUS_ONLY}')" >&2
+        return 1
+    fi
+    if [ -z "${DPUSIMAAS_URL}" ]; then
+        echo "Error: SIMULATED_DPUS_ONLY=true requires DPUSIMAAS_URL (where the simulated DPU hosts come from)" >&2
+        return 1
+    fi
+    # The DPUs' traffic leaves through the simulator's leaf router onto the lab LAN, which is 1500.
+    # Zero Trust installs with 9000 whatever NODES_MTU says, so its large packets between nodes drop.
+    if [ "${DPF_DEPLOYMENT_MODE:-}" != "zero-trust" ] && [ "${NODES_MTU:-1500}" != "1500" ]; then
+        echo "Error: SIMULATED_DPUS_ONLY=true requires NODES_MTU=1500 (got ${NODES_MTU})" >&2
+        return 1
+    fi
+}
+
 # _do_generate_env <defaults_file> <required_file> <template_file> <output_file> <force>
 _do_generate_env() {
     local defaults_file="$1" required_file="$2" template_file="$3"
@@ -641,6 +659,16 @@ if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
 
     if [ "${ARGUS_ENABLED}" = "true" ]; then
         validate_argus_config || return 1
+    fi
+
+    # Defaults for .env files generated before these variables existed.
+    SIMULATED_DPUS_ONLY=${SIMULATED_DPUS_ONLY:-false}
+    SIMULATED_DPU_HOSTDRIVER_IMAGE_REPO=${SIMULATED_DPU_HOSTDRIVER_IMAGE_REPO:-quay.io/otuchfel/hostdriver-sim}
+    SIMULATED_DPU_OVN_CHART_URL=${SIMULATED_DPU_OVN_CHART_URL:-oci://quay.io/otuchfel/charts}
+    SIMULATED_DPU_OVN_CHART_VERSION=${SIMULATED_DPU_OVN_CHART_VERSION:-v26.4.1-ocp-release-v4.22-simdpu}
+    SIMULATED_DPU_OVS_CNI_IMAGE=${SIMULATED_DPU_OVS_CNI_IMAGE:-quay.io/otuchfel/sim-dpu:ovs-cni-simsf-veth2-arm64}
+    if [ "${SIMULATED_DPUS_ONLY}" = "true" ]; then
+        validate_simulated_dpus || return 1
     fi
 fi
 

@@ -1,0 +1,5 @@
+#!/bin/bash
+# dpusim: a NIC with nothing pending, so no reset is needed
+case " $* " in *" --version "*|*" -v "*) exec /usr/bin/mlxfwreset "$@";; esac
+case " $* " in *" --json "*) echo '{"reset_needed": false, "pending_nvconfig_parameters": [], "reasons": []}'; exit 0;; esac
+echo "dpusim: mlxfwreset $* (simulated)"

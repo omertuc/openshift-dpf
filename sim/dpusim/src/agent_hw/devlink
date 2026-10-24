@@ -1,0 +1,7 @@
+#!/bin/bash
+# dpusim: the BlueField's physical port, as devlink lists it
+if [ "$*" = "port show -j" ]; then
+    echo '{"port":{"pci/0000:03:00.0/65535":{"type":"eth","netdev":"p0","flavour":"physical","port":0}}}'
+    exit 0
+fi
+exec /usr/sbin/devlink "$@"

@@ -11,6 +11,7 @@ source "${SCRIPT_DIR}/cluster.sh"
 
 # Use existing path conventions from env.sh
 WORKER_TEMPLATE_DIR="${MANIFESTS_DIR}/worker-provisioning"
+SIMULATED_DPUS_DIR="${MANIFESTS_DIR}/simulated-dpus"
 WORKER_GENERATED_DIR="${GENERATED_DIR}/worker-provisioning"
 
 # -----------------------------------------------------------------------------
@@ -462,6 +463,8 @@ provision_all_workers() {
 
     # Apply short worker hostnames MachineConfig if enabled
     apply_short_worker_hostnames
+    # Before the workers join, so they don't reboot for it
+    apply_simulated_dpus
 
     log "INFO" "Waiting for baremetal cluster operator to be available..."
     if ! retry 30 10 oc get clusteroperator baremetal &>/dev/null; then
@@ -727,6 +730,46 @@ delete_worker() {
     log "INFO" "Worker $bmh_name deletion completed"
 }
 
+# Simulated DPUs (SIMULATED_DPUS_ONLY): every DPU host is a dpusimaas host VM. Its worker
+# MachineConfig makes the VM's igb pair a BlueField-3 (dpusim-bf3-host.sh), names its link to the DPU
+# agent tmfifo_net0 and tells it where dpusimaas is; the mirror has DPF's DMS pods run the simulated
+# hostdriver.
+apply_simulated_dpus() {
+    if [[ "${SIMULATED_DPUS_ONLY:-false}" != "true" ]]; then
+        return 0
+    fi
+    get_kubeconfig
+
+    log "INFO" "SIMULATED_DPUS_ONLY=true: applying the simulated BlueField host MachineConfig, hostdriver mirror and fabric routes"
+    local dir="${SIMULATED_DPUS_DIR}"
+    jq -n \
+        --arg script "$(base64 -w0 < "${dir}/dpusim-bf3-host.sh")" \
+        --arg rules "$(base64 -w0 < "${dir}/99-dpusim.rules")" \
+        --arg env "$(printf 'DPUSIMAAS_URL=%s\n' "${DPUSIMAAS_URL}" | base64 -w0)" \
+        --rawfile unit "${dir}/dpusim-bf3-host.service" '
+        def file($path; $mode; $b64): {path: $path, mode: $mode, overwrite: true,
+            contents: {source: ("data:text/plain;charset=utf-8;base64," + $b64)}};
+        {apiVersion: "machineconfiguration.openshift.io/v1", kind: "MachineConfig",
+         metadata: {name: "99-worker-simulated-dpu",
+                    labels: {"machineconfiguration.openshift.io/role": "worker"}},
+         spec: {config: {ignition: {version: "3.2.0"},
+            storage: {files: [
+                file("/usr/local/bin/dpusim-bf3-host"; 493; $script),
+                file("/etc/udev/rules.d/99-dpusim.rules"; 420; $rules),
+                file("/etc/dpusim/dpusimaas.env"; 420; $env)]},
+            systemd: {units: [{name: "dpusim-bf3-host.service", enabled: true, contents: $unit}]}}}}' \
+        | oc apply -f -
+
+    sed "s|<SIMULATED_DPU_HOSTDRIVER_IMAGE_REPO>|${SIMULATED_DPU_HOSTDRIVER_IMAGE_REPO}|" \
+        "${dir}/hostdriver-mirror.yaml" | oc apply -f -
+    # The DPUs' VTEP subnet is behind the cluster's leaf router (the lease's cluster is CLUSTER_NAME).
+    sed -e "s|<DPUSIMAAS_URL>|${DPUSIMAAS_URL%/}|" \
+        -e "s|<SIMULATED_DPU_CLUSTER>|${CLUSTER_NAME}|" \
+        -e "s|<VTEP_CIDR>|${VTEP_CIDR}|" \
+        "${dir}/fabric-routes.yaml" | oc apply -f -
+    log "INFO" "Simulated DPU host configuration applied"
+}
+
 # Command dispatcher
 case "${1:-}" in
     provision-all-workers) provision_all_workers ;;
@@ -734,6 +777,7 @@ case "${1:-}" in
     display-worker-status) display_worker_status ;;
     display-manual-csr-instructions) display_manual_csr_instructions ;;
     apply-short-worker-hostnames) apply_short_worker_hostnames ;;
+    apply-simulated-dpus) apply_simulated_dpus ;;
     deploy-csr-auto-approver) deploy_csr_auto_approver ;;
     delete-csr-auto-approver) delete_csr_auto_approver ;;
     delete-worker) delete_worker "${2:-}" ;;
@@ -742,7 +786,7 @@ case "${1:-}" in
     poweron-all-workers) poweron_workers false ;;
     wait-for-dpu-redfish) wait_for_zero_trust_dpu_redfish ;;
     *)
-        echo "Usage: $0 {provision-all-workers|approve-worker-csrs|display-worker-status|display-manual-csr-instructions|apply-short-worker-hostnames|deploy-csr-auto-approver|delete-csr-auto-approver|delete-worker <bmh-name|machine-name|node-name>|shutoff-all-workers|poweron-workers|poweron-all-workers|wait-for-dpu-redfish}"
+        echo "Usage: $0 {provision-all-workers|approve-worker-csrs|display-worker-status|display-manual-csr-instructions|apply-short-worker-hostnames|apply-simulated-dpus|deploy-csr-auto-approver|delete-csr-auto-approver|delete-worker <bmh-name|machine-name|node-name>|shutoff-all-workers|poweron-workers|poweron-all-workers|wait-for-dpu-redfish}"
         exit 1
         ;;
 esac

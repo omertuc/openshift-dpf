@@ -1,0 +1,13 @@
+# Build: podman build --platform linux/amd64,linux/arm64 --manifest quay.io/otuchfel/sim-dpu:sf-device-plugin .
+FROM --platform=$BUILDPLATFORM docker.io/library/golang:1.26 AS builder
+ARG TARGETARCH
+WORKDIR /workspace
+COPY go.mod go.sum ./
+RUN go mod download
+COPY *.go ./
+RUN CGO_ENABLED=0 GOARCH=$TARGETARCH go build -trimpath -o sf-device-plugin .
+
+# Root: it serves a socket in the kubelet's device-plugins directory.
+FROM gcr.io/distroless/static
+COPY --from=builder /workspace/sf-device-plugin /sf-device-plugin
+ENTRYPOINT ["/sf-device-plugin"]

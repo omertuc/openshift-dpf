@@ -1,0 +1,12 @@
+[Unit]
+Description=Simulated BlueField-3 on this DPU host VM (SIMULATED_DPUS_ONLY)
+After=systemd-udev-settle.service NetworkManager.service
+Before=kubelet-dependencies.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/dpusim-bf3-host
+
+[Install]
+WantedBy=multi-user.target

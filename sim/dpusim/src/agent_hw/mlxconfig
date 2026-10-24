@@ -1,0 +1,13 @@
+#!/bin/bash
+# dpusim: no NIC firmware to configure; versions come from the real MFT. Queries see a BlueField
+# in DPU mode (DPF's node-problem-detector checks INTERNAL_CPU_MODEL).
+case " $* " in *" --version "*|*" -v "*) exec /usr/bin/mlxconfig "$@";; esac
+case " $* " in
+*" q "*|*" query "*)
+    echo "Configurations:                                          Next Boot"
+    case " $* " in *" INTERNAL_CPU_MODEL "*|*" q "|*" query ")
+        echo "        INTERNAL_CPU_MODEL                          EMBEDDED_CPU(1)";;
+    esac
+    exit 0;;
+esac
+echo "dpusim: mlxconfig $* (simulated, nothing to apply)"

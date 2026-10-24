@@ -376,6 +376,14 @@ prepare_dpf_manifests() {
             "<SRIOV_DP_RESOURCE_PREFIX>" "$SRIOV_DP_RESOURCE_PREFIX" \
             "<FLANNEL_CONFIG>" "$flannel_config" \
             "<NODES_MTU>" "$NODES_MTU"
+        if [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
+            # The simulated DPUs' SFs need ovs-cni's simulated-SF support.
+            cat >> "$GENERATED_DIR/dpfoperatorconfig.yaml" <<EOF
+  ovsCNI:
+    cni:
+      image: ${SIMULATED_DPU_OVS_CNI_IMAGE}
+EOF
+        fi
     fi
 
     # Final verification: ensure no Helm values files are in the generated directory

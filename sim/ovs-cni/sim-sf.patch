@@ -1,0 +1,167 @@
+From 95b7b00e9be1229cbc0e639a46f90a4590c5674c Mon Sep 17 00:00:00 2001
+From: Omer Tuchfeld <omer@tuchfeld.dev>
+Date: Thu, 8 Oct 2026 04:04:00 +0200
+Subject: [PATCH] ovs-cni: simulated scalable functions
+
+On a DPU without SF hardware a device plugin advertises device IDs with
+the prefix sim-sf-. For those, create a veth pair instead of looking up an
+auxiliary SF device and its representor: the container end (renamed to the
+requested ifname) is the SF, the other end a plain OVS port (OVS's kernel
+datapath). The veth goes away with the container; CmdDel drops its OVS port.
+See openshift-dpf sim/.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+Signed-off-by: Omer Tuchfeld <omer@tuchfeld.dev>
+---
+ .../forked/ovs-cni/pkg/plugin/plugin.go       | 86 +++++++++++++++++--
+ 1 file changed, 80 insertions(+), 6 deletions(-)
+
+diff --git a/third_party/forked/ovs-cni/pkg/plugin/plugin.go b/third_party/forked/ovs-cni/pkg/plugin/plugin.go
+index f50e151d..009e9267 100644
+--- a/third_party/forked/ovs-cni/pkg/plugin/plugin.go
++++ b/third_party/forked/ovs-cni/pkg/plugin/plugin.go
+@@ -23,6 +23,7 @@ import (
+ 	"net"
+ 	"runtime"
+ 	"sort"
++	"strings"
+ 	"time"
+ 
+ 	"github.com/containernetworking/cni/pkg/skel"
+@@ -136,6 +137,55 @@ func setupVeth(contNetns ns.NetNS, contIfaceName string, requestedMac string, mt
+ 	return hostIface, contIface, nil
+ }
+ 
++// Simulated scalable functions: see openshift-dpf sim/. A DPU without SF
++// hardware advertises device IDs with this prefix. Such a "SF" is a veth pair:
++// the container end is the SF netdev, the host end, an OVS port on the
++// bridge, is the SF representor. The DPU's OVS runs the kernel datapath.
++const simSFPrefix = "sim-sf-"
++
++func isSimSF(deviceID string) bool {
++	return strings.HasPrefix(deviceID, simSFPrefix)
++}
++
++// simSFPortName is the OVS port name of a simulated SF: deterministic, so
++// CmdDel finds it without a netns, and at most 15 characters.
++func simSFPortName(containerID, ifName string) string {
++	return fmt.Sprintf("ssf%x", sha256.Sum256([]byte(containerID+"/"+ifName)))[:15]
++}
++
++// setupSimSF creates the veth pair of a simulated SF from inside the
++// container, so both ends go away with the container.
++func setupSimSF(contNetns ns.NetNS, containerID, ifName, requestedMac string, mtu int) (*current.Interface, *current.Interface, error) {
++	hostName := simSFPortName(containerID, ifName)
++	// A leftover from an earlier attempt with the same name.
++	if link, err := netlink.LinkByName(hostName); err == nil {
++		_ = netlink.LinkDel(link)
++	}
++	hostIface := &current.Interface{}
++	contIface := &current.Interface{}
++	err := contNetns.Do(func(hostNetns ns.NetNS) error {
++		hostVeth, contVeth, err := ip.SetupVethWithName(ifName, hostName, mtu, requestedMac, hostNetns)
++		if err != nil {
++			return err
++		}
++		if err := setInterfaceUp(ifName); err != nil {
++			return err
++		}
++		contIface.Name = contVeth.Name
++		contIface.Mac = contVeth.HardwareAddr.String()
++		contIface.Sandbox = contNetns.Path()
++		hostIface.Name = hostVeth.Name
++		return nil
++	})
++	if err != nil {
++		return nil, nil, err
++	}
++	if err = refetchIface(hostIface); err != nil {
++		return nil, nil, err
++	}
++	return hostIface, contIface, nil
++}
++
+ func setInterfaceUp(name string) error {
+ 	link, err := netlink.LinkByName(name)
+ 	if err != nil {
+@@ -341,7 +391,8 @@ func CmdAdd(args *skel.CmdArgs) error {
+ 
+ 	// check if the device driver is the type of userspace driver
+ 	userspaceMode := false
+-	if sriov.IsOvsHardwareOffloadEnabled(netconf.DeviceID) {
++	simSF := isSimSF(netconf.DeviceID)
++	if sriov.IsOvsHardwareOffloadEnabled(netconf.DeviceID) && !simSF {
+ 		if sriov.IsPCIDeviceName(netconf.DeviceID) {
+ 			userspaceMode, err = sriov.HasUserspaceDriver(netconf.DeviceID)
+ 			if err != nil {
+@@ -373,7 +424,7 @@ func CmdAdd(args *skel.CmdArgs) error {
+ 
+ 	// userspace driver does not create a network interface for the VF on the host
+ 	var origIfName string
+-	if sriov.IsOvsHardwareOffloadEnabled(netconf.DeviceID) && !userspaceMode {
++	if sriov.IsOvsHardwareOffloadEnabled(netconf.DeviceID) && !userspaceMode && !simSF {
+ 		if sriov.IsPCIDeviceName(netconf.DeviceID) {
+ 			origIfName, err = sriov.GetVFLinkName(netconf.DeviceID)
+ 		} else { // Auxiliary network device
+@@ -391,7 +442,16 @@ func CmdAdd(args *skel.CmdArgs) error {
+ 	}
+ 
+ 	var hostIface, contIface *current.Interface
+-	if sriov.IsOvsHardwareOffloadEnabled(netconf.DeviceID) {
++	intfType := netconf.InterfaceType
++	if simSF {
++		hostIface, contIface, err = setupSimSF(contNetns, args.ContainerID, args.IfName, mac, mtu)
++		if err != nil {
++			return err
++		}
++		// A veth is a plain (system) port, whatever type the
++		// network asks for for real SFs (dpdk).
++		intfType = ""
++	} else if sriov.IsOvsHardwareOffloadEnabled(netconf.DeviceID) {
+ 		hostIface, contIface, err = sriov.SetupSriovInterface(contNetns, args.ContainerID, args.IfName, mac, mtu, netconf.DeviceID, userspaceMode)
+ 		if err != nil {
+ 			return err
+@@ -424,7 +484,7 @@ func CmdAdd(args *skel.CmdArgs) error {
+ 
+ 	if err = attachIfaceToBridge(ovsBridgeDriver, hostIface.Name, contIface,
+ 		netconf.OfportRequest, vlanTagNum, trunks,
+-		portType, netconf.InterfaceType, mtu, args.Netns,
++		portType, intfType, mtu, args.Netns,
+ 		ovnPort, contPodUid, dpfId); err != nil {
+ 		return err
+ 	}
+@@ -674,7 +734,13 @@ func CmdDel(args *skel.CmdArgs) error {
+ 
+ 		// The CNI_NETNS parameter may be empty according to version 0.4.0
+ 		// of the CNI spec (https://github.com/containernetworking/cni/blob/spec-v0.4.0/SPEC.md).
+-		if sriov.IsOvsHardwareOffloadEnabled(cache.Netconf.DeviceID) {
++		if isSimSF(cache.Netconf.DeviceID) {
++			// The veth goes away with the container; drop its OVS port.
++			if err = removeOvsPort(ovsBridgeDriver, simSFPortName(args.ContainerID, args.IfName)); err != nil {
++				log.Printf("Error: %v\n", err)
++			}
++			err = nil
++		} else if sriov.IsOvsHardwareOffloadEnabled(cache.Netconf.DeviceID) {
+ 			// SR-IOV Case - The sriov device is moved into host network namespace when args.Netns is empty.
+ 			// This happens container is killed due to an error (example: CrashLoopBackOff, OOMKilled)
+ 			var rep string
+@@ -733,7 +799,15 @@ func CmdDel(args *skel.CmdArgs) error {
+ 		}
+ 	}
+ 
+-	if sriov.IsOvsHardwareOffloadEnabled(cache.Netconf.DeviceID) {
++	if isSimSF(cache.Netconf.DeviceID) {
++		// The veth goes away with the container; drop its OVS port.
++		if !portFound {
++			if err := removeOvsPort(ovsBridgeDriver, simSFPortName(args.ContainerID, args.IfName)); err != nil {
++				log.Printf("Error: %v\n", err)
++			}
++		}
++		err = nil
++	} else if sriov.IsOvsHardwareOffloadEnabled(cache.Netconf.DeviceID) {
+ 		// there is no network interface in case of userspace driver, so OrigIfName is empty
+ 		if !cache.UserspaceMode {
+ 			err = sriov.ReleaseVF(args, cache.OrigIfName)
+-- 
+2.55.0
+
