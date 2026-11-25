@@ -210,16 +210,69 @@ function deploy_core_operator_sources() {
 }
 
 # Function to prepare DPF manifests
-prepare_zero_trust_objects() {
+prepare_dpf_operator_config() {
     local flannel_config="$1"
-    local inventory_dir="${GENERATED_DIR}/zero-trust-inventory"
+    local deployment_mode=""
+    local image_pull_secrets=""
+    local dpu_detector=""
+    local api_vip=""
+    local networking_mode_fields=""
+    local provisioning_controller_mode_fields=""
+    local node_sriov_device_plugin_controller=""
+    local dpu_service_controller=""
+    local ovs_cni_config=""
+
+    if [ "$DPF_DEPLOYMENT_MODE" = "zero-trust" ]; then
+        deployment_mode="zero-trust"
+        dpu_detector="dpuDetector:
+    disable: true"
+        api_vip="$HOST_CLUSTER_API"
+        provisioning_controller_mode_fields="nodeEffectRemovalTimeout: \"3600s\"
+    installInterface:
+      installViaRedfish:
+        # Set registry.loadBalancerAddress only when an external LB is provisioned.
+        skipDPUNodeDiscovery: true"
+    else
+        deployment_mode="host-trusted"
+        image_pull_secrets="imagePullSecrets:
+    - dpf-pull-secret"
+        api_vip="api.$CLUSTER_NAME.$BASE_DOMAIN"
+        networking_mode_fields="controlPlaneMTU: $NODES_MTU
+    dpuNodeOOBBridgeName: br-ex"
+        node_sriov_device_plugin_controller="nodeSRIOVDevicePluginController:
+    devicePlugin:
+      defaultResourcePrefix: $SRIOV_DP_RESOURCE_PREFIX
+    disable: false
+    replicas: 1"
+        dpu_service_controller="dpuServiceController:
+    disableHostNetworkReadyNoExecuteTaints: false"
+    fi
+
+    if [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
+        # Simulated SF device IDs need ovs-cni's simulated-SF support in either trust mode.
+        ovs_cni_config="ovsCNI:
+    cni:
+      image: $SIMULATED_DPU_OVS_CNI_IMAGE"
+    fi
 
     update_file_multi_replace \
-        "$MANIFESTS_DIR/dpf-installation/zero-trust/dpfoperatorconfig.yaml" \
+        "$MANIFESTS_DIR/dpf-installation/dpfoperatorconfig.yaml" \
         "$GENERATED_DIR/dpfoperatorconfig.yaml" \
-        "<HOST_CLUSTER_API>" "$HOST_CLUSTER_API" \
         "<FLANNEL_CONFIG>" "$flannel_config" \
-        "<NODES_MTU>" "$NODES_MTU"
+        "<DEPLOYMENT_MODE>" "$deployment_mode" \
+        "<IMAGE_PULL_SECRETS>" "$image_pull_secrets" \
+        "<DPU_DETECTOR>" "$dpu_detector" \
+        "<NODES_MTU>" "$NODES_MTU" \
+        "<NETWORKING_MODE_FIELDS>" "$networking_mode_fields" \
+        "<KUBERNETES_API_VIP>" "$api_vip" \
+        "<PROVISIONING_CONTROLLER_MODE_FIELDS>" "$provisioning_controller_mode_fields" \
+        "<NODE_SRIOV_DEVICE_PLUGIN_CONTROLLER>" "$node_sriov_device_plugin_controller" \
+        "<DPU_SERVICE_CONTROLLER>" "$dpu_service_controller" \
+        "<OVS_CNI_CONFIG>" "$ovs_cni_config"
+}
+
+prepare_zero_trust_objects() {
+    local inventory_dir="${GENERATED_DIR}/zero-trust-inventory"
 
     update_file_multi_replace \
         "$MANIFESTS_DIR/dpf-installation/zero-trust/bmc-shared-password.yaml" \
@@ -337,25 +390,9 @@ prepare_dpf_manifests() {
     podCIDR: ${FLANNEL_POD_CIDR}"
     fi
 
+    prepare_dpf_operator_config "${flannel_config}" || return 1
     if [ "${DPF_DEPLOYMENT_MODE}" = "zero-trust" ]; then
-        prepare_zero_trust_objects "${flannel_config}" || return 1
-    else
-        update_file_multi_replace \
-            "$MANIFESTS_DIR/dpf-installation/dpfoperatorconfig.yaml" \
-            "$GENERATED_DIR/dpfoperatorconfig.yaml" \
-            "<CLUSTER_NAME>" "$CLUSTER_NAME" \
-            "<BASE_DOMAIN>" "$BASE_DOMAIN" \
-            "<SRIOV_DP_RESOURCE_PREFIX>" "$SRIOV_DP_RESOURCE_PREFIX" \
-            "<FLANNEL_CONFIG>" "$flannel_config" \
-            "<NODES_MTU>" "$NODES_MTU"
-        if [ "${SIMULATED_DPUS_ONLY:-false}" = "true" ]; then
-            # The simulated DPUs' SFs need ovs-cni's simulated-SF support.
-            cat >> "$GENERATED_DIR/dpfoperatorconfig.yaml" <<EOF
-  ovsCNI:
-    cni:
-      image: ${SIMULATED_DPU_OVS_CNI_IMAGE}
-EOF
-        fi
+        prepare_zero_trust_objects || return 1
     fi
 
     # Final verification: ensure no Helm values files are in the generated directory

@@ -4,13 +4,14 @@ metadata:
   name: dpfoperatorconfig
   namespace: dpf-operator-system
 spec:
-  deploymentMode: host-trusted
-  imagePullSecrets:
-    - dpf-pull-secret
+  deploymentMode: <DEPLOYMENT_MODE>
+  <FLANNEL_CONFIG>
+  <IMAGE_PULL_SECRETS>
+  <DPU_DETECTOR>
   # Kamaji is permanently disabled - only Hypershift is supported
   kamajiClusterManager:
     disable: true
-  #Openshift multus is used for DPU cluster 
+  # OpenShift multus is used for the DPU cluster.
   multus:
     disable: true
   cniInstaller:
@@ -18,33 +19,27 @@ spec:
     # fails HBN/SFC pods with "failed to find plugin ovs".
     disable: false
   overrides:
-    kubernetesAPIServerVIP: api.<CLUSTER_NAME>.<BASE_DOMAIN>
+    kubernetesAPIServerVIP: <KUBERNETES_API_VIP>
     kubernetesAPIServerPort: 6443
     dpuCNIBinPath: /var/lib/cni/bin/
     dpuCNIPath: /run/multus/cni/net.d/
-    # Configure lib64 path for RHCOS systems
+    # Configure lib64 path for RHCOS systems.
     dpuOpenvSwitchSystemSharedLib64Path: /lib64
-    # Configure linker cache and opt library path for RHCOS systems
+    # Configure linker cache and opt library path for RHCOS systems.
     dpuLinkerCachePath: /etc/ld.so.cache
     dpuOptLibraryPath: /usr/opt
-    # When using OpenShift Multus (default), Flannel needs to install CNI config
+    # When using OpenShift Multus, Flannel needs to install CNI config.
     flannelSkipCNIConfigInstallation: false
   provisioningController:
     enableDynamicBFCFGTemplates: true
     hostAgentDNSPolicy: Default
     dmsTimeout: 900
-  nodeSRIOVDevicePluginController:
-    devicePlugin:
-      defaultResourcePrefix: <SRIOV_DP_RESOURCE_PREFIX>
-    disable: false
-    replicas: 1
+    <PROVISIONING_CONTROLLER_MODE_FIELDS>
+  <NODE_SRIOV_DEVICE_PLUGIN_CONTROLLER>
   staticClusterManager:
     disable: false
-  <FLANNEL_CONFIG>
   networking:
-    controlPlaneMTU: <NODES_MTU>
     highSpeedMTU: <NODES_MTU>
-    dpuNodeOOBBridgeName: br-ex
-  dpuServiceController:
-    disableHostNetworkReadyNoExecuteTaints: false
-
+    <NETWORKING_MODE_FIELDS>
+  <DPU_SERVICE_CONTROLLER>
+  <OVS_CNI_CONFIG>
